@@ -2,16 +2,15 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { PlusIcon, SearchIcon } from "lucide-react"
 
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command"
 import { NAV_SECTIONS } from "@/components/layout/nav-config"
 
@@ -20,6 +19,10 @@ type CommandMenuProps = {
   onOpenChange: (open: boolean) => void
 }
 
+/**
+ * Navigation command palette. Real full-text search over CRM data will hook in
+ * here later; for now it's a fast keyboard route switcher only.
+ */
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   const router = useRouter()
 
@@ -34,57 +37,33 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
     return () => document.removeEventListener("keydown", onKeyDown)
   }, [open, onOpenChange])
 
-  function runCommand(action: () => void) {
+  function go(href: string) {
     onOpenChange(false)
-    action()
+    router.push(href)
   }
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Firma, kişi veya fırsat ara…" />
-      <CommandList>
-        <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
-
-        <CommandGroup heading="Hızlı işlemler">
-          <CommandItem
-            onSelect={() => runCommand(() => router.push("/companies"))}
-          >
-            <PlusIcon />
-            Firma ekle
-          </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => router.push("/opportunities"))}
-          >
-            <PlusIcon />
-            Fırsat ekle
-          </CommandItem>
-        </CommandGroup>
-
-        <CommandSeparator />
-
-        {NAV_SECTIONS.map((section) => (
-          <CommandGroup key={section.label} heading={section.label}>
-            {section.items.map((item) => (
-              <CommandItem
-                key={item.href}
-                onSelect={() => runCommand(() => router.push(item.href))}
-              >
-                <item.icon />
-                {item.title}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Arama">
-          <CommandItem disabled>
-            <SearchIcon />
-            Tam metin arama yakında eklenecek
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
+      <Command>
+        <CommandInput placeholder="Sayfa ara veya git…" />
+        <CommandList>
+          <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
+          {NAV_SECTIONS.map((section) => (
+            <CommandGroup key={section.label} heading={section.label}>
+              {section.items.map((item) => (
+                <CommandItem
+                  key={item.href}
+                  value={`${section.label} ${item.title}`}
+                  onSelect={() => go(item.href)}
+                >
+                  <item.icon />
+                  {item.title}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </Command>
     </CommandDialog>
   )
 }

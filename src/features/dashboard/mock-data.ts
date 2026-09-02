@@ -13,6 +13,7 @@ import type {
   PipelineRow,
   PipelineStageSummary,
   TodayTask,
+  WeeklyFocus,
 } from "@/features/dashboard/types"
 
 /**
@@ -65,6 +66,17 @@ export const KPIS: Kpi[] = [
     icon: WalletIcon,
   },
 ]
+
+export const WEEKLY_FOCUS: WeeklyFocus = {
+  periodLabel: "Bu hafta",
+  targetLabel: "hedef firma",
+  target: 20,
+  steps: [
+    { key: "contacted", label: "İletişime geçildi", count: 14 },
+    { key: "replied", label: "Dönüş alındı", count: 7 },
+    { key: "meeting", label: "Görüşme", count: 4 },
+  ],
+}
 
 export const TODAY_TASKS: TodayTask[] = [
   {

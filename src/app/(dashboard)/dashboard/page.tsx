@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { PlusIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/page-header"
-import { KpiCards } from "@/features/dashboard/components/kpi-cards"
+import { ComingSoonButton } from "@/components/common/coming-soon-button"
+import { StatStrip } from "@/features/dashboard/components/stat-strip"
+import { WeeklyFocus } from "@/features/dashboard/components/weekly-focus"
 import { ActionCenter } from "@/features/dashboard/components/action-center"
 import { PipelineSummary } from "@/features/dashboard/components/pipeline-summary"
 import { RecentActivities } from "@/features/dashboard/components/recent-activities"
@@ -15,6 +15,7 @@ import {
   PIPELINE_SUMMARY,
   RECENT_ACTIVITIES,
   TODAY_TASKS,
+  WEEKLY_FOCUS,
 } from "@/features/dashboard/mock-data"
 
 export const metadata: Metadata = {
@@ -23,19 +24,19 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Genel Bakış"
         description="Sponsorluk süreçlerinin güncel durumunu takip et."
         actions={
-          <Button render={<Link href="/companies" />} nativeButton={false}>
+          <ComingSoonButton hint="Firma ekleme yakında eklenecek.">
             <PlusIcon />
             Firma Ekle
-          </Button>
+          </ComingSoonButton>
         }
       />
 
-      <KpiCards items={KPIS} />
+      <StatStrip items={KPIS} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="flex flex-col gap-5 lg:col-span-2">
@@ -43,6 +44,7 @@ export default function DashboardPage() {
           <QuickPipelineTable rows={PIPELINE_ROWS} />
         </div>
         <div className="flex flex-col gap-5">
+          <WeeklyFocus data={WEEKLY_FOCUS} />
           <PipelineSummary stages={PIPELINE_SUMMARY} />
           <RecentActivities activities={RECENT_ACTIVITIES} />
         </div>

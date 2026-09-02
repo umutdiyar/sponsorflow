@@ -13,7 +13,7 @@ export function PipelineSummary({ stages }: PipelineSummaryProps) {
     <Panel>
       <PanelHeader
         title="Pipeline Özeti"
-        description={`${total} fırsat · 8 aşama`}
+        description={`${total} fırsat · ${stages.length} aşama`}
         action={{ label: "Pipeline", href: "/pipeline" }}
       />
       <PanelContent className="flex flex-col gap-2.5">

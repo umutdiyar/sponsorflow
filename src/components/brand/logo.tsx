@@ -12,7 +12,7 @@ export function LogoMark({ className }: LogoMarkProps) {
   return (
     <span
       className={cn(
-        "bg-brand text-brand-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md",
+        "bg-brand text-brand-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-[7px]",
         className
       )}
       aria-hidden
@@ -37,14 +37,27 @@ export function LogoMark({ className }: LogoMarkProps) {
 type WordmarkProps = {
   className?: string
   withMark?: boolean
+  /** Show the "AWS Student Builder Group / Istanbul Okan University" identity. */
+  withOrg?: boolean
 }
 
-export function Wordmark({ className, withMark = true }: WordmarkProps) {
+export function Wordmark({
+  className,
+  withMark = true,
+  withOrg = false,
+}: WordmarkProps) {
   return (
-    <span className={cn("flex items-center gap-2", className)}>
+    <span className={cn("flex items-center gap-2.5", className)}>
       {withMark ? <LogoMark /> : null}
-      <span className="font-heading text-[0.95rem] leading-none font-semibold tracking-tight">
-        SponsorFlow
+      <span className="flex min-w-0 flex-col">
+        <span className="font-heading text-[0.9rem] leading-tight font-semibold tracking-tight">
+          SponsorFlow
+        </span>
+        {withOrg ? (
+          <span className="text-[0.6875rem] leading-tight opacity-60">
+            AWS Student Builder Group
+          </span>
+        ) : null}
       </span>
     </span>
   )

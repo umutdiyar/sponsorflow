@@ -17,24 +17,24 @@ export default async function LoginPage({
   if (user) redirect("/dashboard")
 
   const { next } = await searchParams
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : undefined
+  const safeNext =
+    next && next.startsWith("/") && !next.startsWith("//") ? next : undefined
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-xl font-semibold tracking-tight">
-          SponsorFlow&apos;a giriş yap
+      <div className="flex flex-col gap-1.5">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          Tekrar hoş geldin
         </h1>
         <p className="text-muted-foreground text-sm">
-          Sponsorluk süreçlerinizi tek noktadan yönetin.
+          Hesabına giriş yaparak devam et.
         </p>
       </div>
 
       <LoginForm next={safeNext} />
 
       <p className="text-muted-foreground text-xs leading-relaxed">
-        Hesabın yok mu? Üyeler organizasyon yöneticisi tarafından davet edilir.
-        Erişim için ekip liderinle iletişime geç.
+        Bu panel yalnızca yetkilendirilmiş ekip üyeleri içindir.
       </p>
     </div>
   )

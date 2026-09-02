@@ -50,3 +50,16 @@ export type PipelineRow = {
   nextAction: string
   value: string
 }
+
+export type WeeklyFocusStep = {
+  key: string
+  label: string
+  count: number
+}
+
+export type WeeklyFocus = {
+  periodLabel: string
+  targetLabel: string
+  target: number
+  steps: WeeklyFocusStep[]
+}

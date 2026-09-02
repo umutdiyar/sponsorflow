@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { Building2Icon, PlusIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { ComingSoonButton } from "@/components/common/coming-soon-button"
 import { PlaceholderPage } from "@/components/common/placeholder-page"
 
 export const metadata: Metadata = { title: "Firmalar" }
@@ -16,10 +15,10 @@ export default function CompaniesPage() {
       emptyTitle="Henüz firma eklenmemiş."
       emptyDescription="İlk firmanı ekleyerek sponsorluk sürecini başlat."
       actions={
-        <Button render={<Link href="/companies" />} nativeButton={false}>
+        <ComingSoonButton hint="Firma ekleme yakında eklenecek.">
           <PlusIcon />
           Firma Ekle
-        </Button>
+        </ComingSoonButton>
       }
     />
   )

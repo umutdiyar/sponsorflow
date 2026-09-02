@@ -1,30 +1,29 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { BellIcon, PanelLeftIcon, SearchIcon } from "lucide-react"
+import { PanelLeftIcon, SearchIcon } from "lucide-react"
 
-import type { SessionUser } from "@/lib/auth/dal"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { getPageTitle } from "@/components/layout/nav-config"
+import { useCurrentUser } from "@/components/layout/current-user"
 import { UserMenu } from "@/components/layout/user-menu"
 
 type AppHeaderProps = {
-  user: SessionUser
   onOpenMobileSidebar: () => void
   onOpenCommandMenu: () => void
 }
 
 export function AppHeader({
-  user,
   onOpenMobileSidebar,
   onOpenCommandMenu,
 }: AppHeaderProps) {
   const pathname = usePathname()
+  const user = useCurrentUser()
   const title = getPageTitle(pathname)
 
   return (
-    <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 flex h-14 items-center gap-2 border-b px-3 backdrop-blur sm:px-4">
+    <header className="bg-background/90 supports-backdrop-filter:bg-background/70 sticky top-0 z-30 flex h-12 items-center gap-2 border-b px-3 backdrop-blur sm:px-4">
       <Button
         variant="ghost"
         size="icon-sm"
@@ -41,33 +40,22 @@ export function AppHeader({
         <button
           type="button"
           onClick={onOpenCommandMenu}
-          className="border-input bg-input/30 text-muted-foreground hover:bg-input/50 hidden h-8 w-64 items-center gap-2 rounded-lg border px-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring md:flex"
+          aria-keyshortcuts="Meta+K Control+K"
+          className="border-input bg-muted/40 text-muted-foreground hover:bg-muted hidden h-8 w-56 items-center gap-2 rounded-lg border px-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring lg:flex xl:w-64"
         >
           <SearchIcon className="size-4 shrink-0" />
-          <span className="flex-1 truncate text-left">
-            Firma, kişi veya fırsat ara…
-          </span>
+          <span className="flex-1 truncate text-left">Ara…</span>
           <Kbd>⌘K</Kbd>
         </button>
 
         <Button
           variant="ghost"
           size="icon-sm"
-          className="md:hidden"
+          className="lg:hidden"
           onClick={onOpenCommandMenu}
           aria-label="Ara"
         >
           <SearchIcon />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Bildirimler"
-          className="relative"
-        >
-          <BellIcon />
-          <span className="bg-brand absolute top-1.5 right-1.5 size-1.5 rounded-full" />
         </Button>
 
         <div className="ml-1 hidden sm:block">

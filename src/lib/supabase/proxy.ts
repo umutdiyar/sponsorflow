@@ -12,12 +12,36 @@ function isPublicRoute(pathname: string) {
   )
 }
 
+function isPrefetch(request: NextRequest) {
+  return (
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("x-purpose") === "prefetch" ||
+    request.headers.get("x-middleware-prefetch") === "1"
+  )
+}
+
 /**
- * Refreshes the Supabase session cookies on every matched request and performs
- * an optimistic auth redirect. This only reads the session from cookies — no
- * database work — as recommended for proxy/middleware.
+ * Runs before every matched request. Two jobs:
+ *
+ *  1. Keep the Supabase auth cookies fresh (`getSession()` refreshes them only
+ *     when the access token is at/near expiry — otherwise it's a local cookie
+ *     read with no network call).
+ *  2. Optimistic auth redirect for `/login` <-> `/dashboard`.
+ *
+ * This is an *optimistic* check by design (Next.js auth guidance): it trusts the
+ * cookie without a server round-trip on the hot path. The authoritative check is
+ * `requireUser()` in `(dashboard)/layout.tsx`, which calls `getUser()` (verified
+ * against Supabase) on every protected render.
+ *
+ * Prefetch requests never commit a navigation, so they skip all of this — the
+ * real navigation that follows re-runs the proxy.
  */
 export async function updateSession(request: NextRequest) {
+  if (isPrefetch(request)) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({ request })
 
   const { url, publishableKey } = getSupabaseConfig()
@@ -39,19 +63,20 @@ export async function updateSession(request: NextRequest) {
   })
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  const isAuthed = Boolean(session?.user)
 
   const { pathname } = request.nextUrl
 
-  if (!user && !isPublicRoute(pathname)) {
+  if (!isAuthed && !isPublicRoute(pathname)) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/login"
     redirectUrl.searchParams.set("next", pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  if (user && (pathname === "/login" || pathname === "/")) {
+  if (isAuthed && (pathname === "/login" || pathname === "/")) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/dashboard"
     redirectUrl.search = ""

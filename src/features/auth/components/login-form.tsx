@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertCircleIcon, Loader2Icon } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -98,7 +97,13 @@ export function LoginForm({ next }: LoginFormProps) {
         ) : null}
       </div>
 
-      <Button type="submit" size="lg" disabled={isPending} className={cn("mt-1 w-full")}>
+      <Button
+        type="submit"
+        size="lg"
+        disabled={isPending}
+        aria-busy={isPending}
+        className="mt-1 w-full"
+      >
         {isPending ? (
           <>
             <Loader2Icon className="animate-spin" />

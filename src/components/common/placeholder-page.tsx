@@ -14,7 +14,8 @@ type PlaceholderPageProps = {
 
 /**
  * Professional placeholder for modules whose feature work is not in this phase.
- * The navigation and shell are already wired; each page just needs its module.
+ * Uses the same page header, spacing and panel treatment as real pages so the
+ * shell stays consistent across every route.
  */
 export function PlaceholderPage({
   title,
@@ -25,7 +26,7 @@ export function PlaceholderPage({
   actions,
 }: PlaceholderPageProps) {
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 sm:p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader title={title} description={description} actions={actions} />
       <EmptyState
         icon={icon}

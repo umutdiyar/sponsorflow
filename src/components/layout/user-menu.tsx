@@ -28,12 +28,15 @@ type UserMenuProps = {
   user: SessionUser
   collapsed?: boolean
   align?: "start" | "center" | "end"
+  /** Style the trigger for a dark (navy) surface. */
+  onDark?: boolean
 }
 
 export function UserMenu({
   user,
   collapsed = false,
   align = "start",
+  onDark = false,
 }: UserMenuProps) {
   const [isPending, startTransition] = useTransition()
 
@@ -41,7 +44,10 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "hover:bg-accent flex w-full items-center gap-2 rounded-md p-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+          "flex w-full items-center gap-2 rounded-md p-1.5 text-left outline-none transition-colors focus-visible:ring-2",
+          onDark
+            ? "hover:bg-sidebar-accent focus-visible:ring-sidebar-ring"
+            : "hover:bg-accent focus-visible:ring-ring",
           collapsed && "w-auto justify-center p-1"
         )}
       >
@@ -55,11 +61,21 @@ export function UserMenu({
           <>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-medium">{user.name}</span>
-              <span className="text-muted-foreground truncate text-xs">
+              <span
+                className={cn(
+                  "truncate text-xs",
+                  onDark ? "text-sidebar-foreground/55" : "text-muted-foreground"
+                )}
+              >
                 {user.role}
               </span>
             </span>
-            <ChevronsUpDownIcon className="text-muted-foreground size-3.5 shrink-0" />
+            <ChevronsUpDownIcon
+              className={cn(
+                "size-3.5 shrink-0",
+                onDark ? "text-sidebar-foreground/40" : "text-muted-foreground"
+              )}
+            />
           </>
         ) : null}
       </DropdownMenuTrigger>
