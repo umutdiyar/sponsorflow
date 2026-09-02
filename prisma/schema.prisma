@@ -42,6 +42,35 @@ enum PipelineStageType {
   LOST
 }
 
+/// What happened on a company / opportunity — a past event, logged after the fact.
+enum ActivityType {
+  EMAIL
+  PHONE
+  MEETING
+  LINKEDIN
+  WHATSAPP
+  NOTE
+  PROPOSAL
+  FOLLOW_UP
+  STAGE_CHANGE
+}
+
+/// How urgent a task is.
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+/// Lifecycle state of a task.
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
@@ -73,10 +102,14 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    OrganizationMembership[]
-  pipelineStages PipelineStage[]
-  companies      Company[]
-  contacts       Contact[]
+  memberships         OrganizationMembership[]
+  pipelineStages      PipelineStage[]
+  companies           Company[]
+  contacts            Contact[]
+  opportunities       Opportunity[]
+  activities          Activity[]
+  tasks               Task[]
+  sponsorshipPackages SponsorshipPackage[]
 }
 
 model OrganizationMembership {
@@ -93,6 +126,12 @@ model OrganizationMembership {
   ownedCompanies   Company[] @relation("CompanyOwner")
   createdCompanies Company[] @relation("CompanyCreatedBy")
   createdContacts  Contact[] @relation("ContactCreatedBy")
+
+  ownedOpportunities   Opportunity[] @relation("OpportunityOwner")
+  createdOpportunities Opportunity[] @relation("OpportunityCreatedBy")
+  createdActivities    Activity[]    @relation("ActivityCreatedBy")
+  assignedTasks        Task[]        @relation("TaskAssignee")
+  createdTasks         Task[]        @relation("TaskCreatedBy")
 
   @@unique([organizationId, profileId])
   @@index([profileId])
@@ -114,6 +153,8 @@ model PipelineStage {
   updatedAt      DateTime          @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  opportunities Opportunity[]
 
   @@unique([organizationId, key])
   @@index([organizationId, position])
@@ -152,7 +193,10 @@ model Company {
   owner        OrganizationMembership? @relation("CompanyOwner", fields: [ownerMembershipId], references: [id], onDelete: SetNull)
   createdBy    OrganizationMembership  @relation("CompanyCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
 
-  contacts Contact[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  activities    Activity[]
+  tasks         Task[]
 
   @@index([organizationId, archivedAt])
   @@index([organizationId, createdAt])
@@ -184,6 +228,158 @@ model Contact {
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy    OrganizationMembership @relation("ContactCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
 
+  activities Activity[]
+
   @@index([organizationId, companyId, archivedAt])
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// Sponsorship operation — opportunities, activities, tasks, packages
+// ---------------------------------------------------------------------------
+
+/// A reusable sponsorship tier the team offers to companies (Altın, Gümüş…).
+/// `benefits` is an ordered list of plain strings ("Sahne konuşması", "Stant").
+/// `price` and `estimatedValue` are stored as whole major currency units
+/// (e.g. Turkish Lira, no kuruş) to keep RSC serialization trivial.
+model SponsorshipPackage {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name        String
+  description String?
+  price       Int?
+  currency    String   @default("TRY")
+  benefits    String[]
+  position    Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+
+  @@index([organizationId, position])
+  @@index([organizationId, isActive])
+}
+
+/// One potential sponsorship deal with a company. A company can have many
+/// opportunities over time; the opportunity carries the pipeline stage, owner,
+/// money estimate and the single "next action" the team has agreed on.
+model Opportunity {
+  id             String @id @default(cuid())
+  organizationId String
+  companyId      String
+
+  title             String
+  ownerMembershipId String
+  stageId           String
+  packageId         String?
+
+  estimatedValue Int?
+  probability    Int?
+  currency       String @default("TRY")
+
+  nextAction        String?
+  nextActionAt      DateTime?
+  expectedCloseDate DateTime?
+  lostReason        String?
+
+  createdByMembershipId String
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner        OrganizationMembership @relation("OpportunityOwner", fields: [ownerMembershipId], references: [id], onDelete: Restrict)
+  createdBy    OrganizationMembership @relation("OpportunityCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  stage        PipelineStage          @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  package      SponsorshipPackage?    @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  activities Activity[]
+  tasks      Task[]
+
+  @@index([organizationId, archivedAt])
+  @@index([organizationId, stageId])
+  @@index([organizationId, nextActionAt])
+  @@index([organizationId, updatedAt])
+  @@index([companyId])
+  @@index([stageId])
+  @@index([ownerMembershipId])
+  @@index([packageId])
+}
+
+/// A logged event — "what happened". Always tied to a company; optionally to a
+/// specific opportunity and/or contact. `STAGE_CHANGE` rows are created
+/// automatically when an opportunity moves between pipeline stages.
+model Activity {
+  id             String  @id @default(cuid())
+  organizationId String
+  companyId      String
+  opportunityId  String?
+  contactId      String?
+
+  createdByMembershipId String
+
+  type        ActivityType
+  title       String?
+  description String?
+  occurredAt  DateTime     @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity?           @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contact      Contact?               @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdBy    OrganizationMembership @relation("ActivityCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, occurredAt])
+  @@index([companyId, occurredAt])
+  @@index([opportunityId, occurredAt])
+  @@index([createdByMembershipId])
+}
+
+/// An action the team still needs to take — "what to do". Distinct from
+/// Activity (which is past tense). Can hang off a company and/or opportunity.
+model Task {
+  id             String @id @default(cuid())
+  organizationId String
+
+  title       String
+  description String?
+
+  assignedToMembershipId String
+  createdByMembershipId  String
+
+  companyId     String?
+  opportunityId String?
+
+  priority TaskPriority @default(MEDIUM)
+  status   TaskStatus   @default(TODO)
+
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company?               @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunity  Opportunity?           @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  assignedTo   OrganizationMembership @relation("TaskAssignee", fields: [assignedToMembershipId], references: [id], onDelete: Restrict)
+  createdBy    OrganizationMembership @relation("TaskCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, archivedAt])
+  @@index([organizationId, status])
+  @@index([organizationId, dueAt])
+  @@index([assignedToMembershipId, status])
+  @@index([opportunityId])
   @@index([companyId])
 }

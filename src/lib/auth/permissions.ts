@@ -26,7 +26,23 @@ export const PERMISSIONS = [
   "pipeline:read",
   "pipeline:update",
 
+  "opportunity:read",
+  "opportunity:create",
+  "opportunity:update",
+  "opportunity:archive",
+
+  "activity:read",
+  "activity:create",
+
+  "task:read",
+  "task:create",
+  "task:update",
+  "task:archive",
+
   "package:read",
+  "package:create",
+  "package:update",
+  "package:archive",
 
   "data:import",
   "data:export",
@@ -42,6 +58,9 @@ const READ_ONLY: Permission[] = [
   "company:read",
   "contact:read",
   "pipeline:read",
+  "opportunity:read",
+  "activity:read",
+  "task:read",
   "package:read",
 ]
 
@@ -51,6 +70,11 @@ const MEMBER: Permission[] = [
   "company:update",
   "contact:create",
   "contact:update",
+  "opportunity:create",
+  "opportunity:update",
+  "activity:create",
+  "task:create",
+  "task:update",
   "data:export",
 ]
 
@@ -59,6 +83,11 @@ const SPONSORSHIP_LEAD: Permission[] = [
   "company:archive",
   "contact:archive",
   "pipeline:update",
+  "opportunity:archive",
+  "task:archive",
+  "package:create",
+  "package:update",
+  "package:archive",
   "member:invite",
   "data:import",
 ]

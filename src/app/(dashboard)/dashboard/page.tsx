@@ -1,52 +1,63 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { PlusIcon } from "lucide-react"
 
+import { requireMembership } from "@/lib/auth/membership"
+import { hasPermission } from "@/lib/auth/permissions"
+import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/page-header"
-import { ComingSoonButton } from "@/components/common/coming-soon-button"
-import { StatStrip } from "@/features/dashboard/components/stat-strip"
 import { WeeklyFocus } from "@/features/dashboard/components/weekly-focus"
-import { ActionCenter } from "@/features/dashboard/components/action-center"
-import { PipelineSummary } from "@/features/dashboard/components/pipeline-summary"
-import { RecentActivities } from "@/features/dashboard/components/recent-activities"
-import { QuickPipelineTable } from "@/features/dashboard/components/quick-pipeline-table"
+import { WEEKLY_FOCUS } from "@/features/dashboard/mock-data"
+import { MetricStrip } from "@/features/dashboard/components/metric-strip"
 import {
-  KPIS,
-  PIPELINE_ROWS,
-  PIPELINE_SUMMARY,
-  RECENT_ACTIVITIES,
-  TODAY_TASKS,
-  WEEKLY_FOCUS,
-} from "@/features/dashboard/mock-data"
+  QuickPipelinePanel,
+  RecentActivityPanel,
+  StageProgress,
+  TodayPanel,
+  UpcomingStrip,
+} from "@/features/dashboard/components/dashboard-sections"
+import { getDashboardData } from "@/features/dashboard/queries"
 
-export const metadata: Metadata = {
-  title: "Genel Bakış",
-}
+export const metadata: Metadata = { title: "Genel Bakış" }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const membership = await requireMembership()
+  const data = await getDashboardData(membership.organizationId)
+  const canCreateCompany = hasPermission(membership.role, "company:create")
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Genel Bakış"
         description="Sponsorluk süreçlerinin güncel durumunu takip et."
         actions={
-          <ComingSoonButton hint="Firma ekleme yakında eklenecek.">
-            <PlusIcon />
-            Firma Ekle
-          </ComingSoonButton>
+          canCreateCompany ? (
+            <Button
+              render={<Link href="/companies?new=1" />}
+              nativeButton={false}
+            >
+              <PlusIcon />
+              Firma Ekle
+            </Button>
+          ) : undefined
         }
       />
 
-      <StatStrip items={KPIS} />
+      <MetricStrip metrics={data.metrics} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="flex flex-col gap-5 lg:col-span-2">
-          <ActionCenter tasks={TODAY_TASKS} />
-          <QuickPipelineTable rows={PIPELINE_ROWS} />
+          <TodayPanel items={data.agenda} />
+          <QuickPipelinePanel rows={data.quickPipeline} />
         </div>
         <div className="flex flex-col gap-5">
+          <UpcomingStrip items={data.agenda} />
           <WeeklyFocus data={WEEKLY_FOCUS} />
-          <PipelineSummary stages={PIPELINE_SUMMARY} />
-          <RecentActivities activities={RECENT_ACTIVITIES} />
+          <StageProgress
+            stages={data.stageSummary}
+            currency={data.currency}
+          />
+          <RecentActivityPanel activities={data.recentActivities} />
         </div>
       </div>
     </div>
