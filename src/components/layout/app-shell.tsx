@@ -12,11 +12,11 @@ import { CurrentUserProvider } from "@/components/layout/current-user"
 
 type AppShellProps = {
   user: SessionUser
-  orgName: string
+  org: { name: string; subtitle?: string }
   children: React.ReactNode
 }
 
-export function AppShell({ user, orgName, children }: AppShellProps) {
+export function AppShell({ user, org, children }: AppShellProps) {
   const [collapsed, , toggleCollapsed] = usePersistentBoolean(
     "sponsorflow:sidebar-collapsed",
     false
@@ -33,8 +33,7 @@ export function AppShell({ user, orgName, children }: AppShellProps) {
           className="sticky top-0 hidden h-svh shrink-0 transition-[width] duration-200 ease-out data-[collapsed=false]:w-60 data-[collapsed=true]:w-15 lg:flex"
         >
           <AppSidebar
-            user={user}
-            orgName={orgName}
+            org={org}
             collapsed={collapsed}
             onToggleCollapsed={toggleCollapsed}
           />
@@ -49,8 +48,7 @@ export function AppShell({ user, orgName, children }: AppShellProps) {
           >
             <SheetTitle className="sr-only">Gezinme menüsü</SheetTitle>
             <AppSidebar
-              user={user}
-              orgName={orgName}
+              org={org}
               collapsed={false}
               onNavigate={() => setMobileOpen(false)}
             />

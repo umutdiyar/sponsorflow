@@ -1,61 +1,102 @@
+import Image from "next/image"
+
 import { cn } from "@/lib/utils"
 
-type LogoMarkProps = {
+const LOGO_SRC = "/brand/aws-sbg-okan-logo.svg"
+const LOGO_ALT = "AWS Student Builder Group at Okan University"
+
+type ClubLogoProps = {
+  /** Rendered box size in px (the mark is square). */
+  size?: number
+  className?: string
+  priority?: boolean
+}
+
+/**
+ * The club's mark — the single visual identity for SponsorFlow's chrome.
+ * Local asset in `public/brand/`; the mark already carries its own dark ground,
+ * so it just needs a rounded frame to read as an app icon on the navy sidebar.
+ */
+export function ClubLogo({ size = 28, className, priority }: ClubLogoProps) {
+  return (
+    <Image
+      src={LOGO_SRC}
+      alt={LOGO_ALT}
+      width={size}
+      height={size}
+      priority={priority}
+      className={cn(
+        "shrink-0 rounded-md object-contain ring-1 ring-white/10",
+        className
+      )}
+      style={{ width: size, height: size }}
+    />
+  )
+}
+
+type BrandIdentityProps = {
+  /** Organization line under the product name. */
+  organization?: string
+  /** Icon-only (collapsed sidebar). */
+  compact?: boolean
   className?: string
 }
 
 /**
- * SponsorFlow mark — three converging bars ("flow") in the brand accent.
- * Independent product identity; not tied to any sponsor's branding.
+ * The one identity block: club mark + "SponsorFlow" / "Sponsorluk CRM", and a
+ * single organization line. No repeated org/university strings, no separate
+ * product icon — one mark, one hierarchy.
  */
-export function LogoMark({ className }: LogoMarkProps) {
+export function BrandIdentity({
+  organization,
+  compact = false,
+  className,
+}: BrandIdentityProps) {
+  if (compact) {
+    return <ClubLogo size={30} className={className} priority />
+  }
+
   return (
-    <span
-      className={cn(
-        "bg-brand text-brand-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-[7px]",
-        className
-      )}
-      aria-hidden
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className="size-4"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M4 7h16M4 12h11M4 17h6"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    </span>
+    <div className={cn("flex flex-col gap-2.5", className)}>
+      <div className="flex items-center gap-2.5">
+        <ClubLogo size={30} priority />
+        <span className="flex min-w-0 flex-col">
+          <span className="font-heading text-[0.9rem] leading-tight font-semibold tracking-tight">
+            SponsorFlow
+          </span>
+          <span className="text-sidebar-foreground/50 text-[0.6875rem] leading-tight">
+            Sponsorluk CRM
+          </span>
+        </span>
+      </div>
+      {organization ? (
+        <p className="text-sidebar-foreground/55 truncate text-xs leading-tight">
+          {organization}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
 type WordmarkProps = {
   className?: string
-  withMark?: boolean
-  /** Show the "AWS Student Builder Group / Istanbul Okan University" identity. */
-  withOrg?: boolean
+  /** Small descriptor under the name. */
+  label?: string
+  size?: number
 }
 
-export function Wordmark({
-  className,
-  withMark = true,
-  withOrg = false,
-}: WordmarkProps) {
+/** Compact brand lockup for the auth screens. */
+export function Wordmark({ className, label, size = 30 }: WordmarkProps) {
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
-      {withMark ? <LogoMark /> : null}
+      <ClubLogo size={size} priority />
       <span className="flex min-w-0 flex-col">
         <span className="font-heading text-[0.9rem] leading-tight font-semibold tracking-tight">
           SponsorFlow
         </span>
-        {withOrg ? (
-          <span className="text-[0.6875rem] leading-tight opacity-60">
-            AWS Student Builder Group
+        {label ? (
+          <span className="text-[0.6875rem] leading-tight opacity-55">
+            {label}
           </span>
         ) : null}
       </span>

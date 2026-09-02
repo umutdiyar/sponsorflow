@@ -1,9 +1,14 @@
 "use server"
 
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import {
+  REMEMBER_COOKIE,
+  REMEMBER_MAX_AGE,
+} from "@/lib/auth/persistence"
 import { loginSchema, type LoginInput } from "@/features/auth/schema"
 
 export type SignInResult = { error: string }
@@ -31,11 +36,19 @@ export async function signIn(
     return { error: parsed.error.issues[0]?.message ?? GENERIC_ERROR }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
+  const { email, password, remember } = parsed.data
+
+  // Persist the remember-me choice first so the auth cookies Supabase writes
+  // during sign-in already get the right lifetime.
+  const cookieStore = await cookies()
+  cookieStore.set(REMEMBER_COOKIE, remember ? "1" : "0", {
+    path: "/",
+    sameSite: "lax",
+    ...(remember ? { maxAge: REMEMBER_MAX_AGE } : {}),
   })
+
+  const supabase = await createClient({ remember })
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     const isInvalid =
@@ -52,6 +65,10 @@ export async function signIn(
 export async function signOut(): Promise<void> {
   const supabase = await createClient()
   await supabase.auth.signOut()
+
+  const cookieStore = await cookies()
+  cookieStore.delete(REMEMBER_COOKIE)
+
   revalidatePath("/", "layout")
   redirect("/login")
 }

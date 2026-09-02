@@ -9,10 +9,10 @@ export default function ContactsPage() {
   return (
     <PlaceholderPage
       title="Kişiler"
-      description="Firmalardaki karar vericileri ve iletişim kişilerini burada takip edeceksin."
+      description="Tüm firmalardaki iletişim kişilerinin birleşik listesi yakında burada olacak."
       icon={UsersIcon}
-      emptyTitle="Henüz kişi eklenmemiş."
-      emptyDescription="Bir firmaya iletişim kişisi ekleyerek görüşmeleri kişiselleştir."
+      emptyTitle="Kişiler firma detayından yönetiliyor."
+      emptyDescription="Şimdilik kişileri ilgili firmanın sayfasındaki Kişiler sekmesinden ekleyebilirsin."
     />
   )
 }

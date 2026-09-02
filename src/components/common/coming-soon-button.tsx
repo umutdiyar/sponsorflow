@@ -28,21 +28,17 @@ export function ComingSoonButton({
   return (
     <Tooltip>
       <TooltipTrigger
-        render={<span tabIndex={0} aria-label={`${hint}`} />}
-        className="inline-flex rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        tabIndex={0}
+        aria-label={hint}
+        className={cn(
+          buttonVariants({ variant: "outline" }),
+          "text-muted-foreground cursor-default gap-1.5 focus-visible:ring-2 focus-visible:ring-ring",
+          className
+        )}
       >
-        <span
-          aria-disabled
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "text-muted-foreground pointer-events-none gap-1.5",
-            className
-          )}
-        >
-          {children}
-          <span className="bg-muted text-muted-foreground ml-0.5 rounded px-1.5 py-0.5 text-[0.625rem] font-medium">
-            Yakında
-          </span>
+        {children}
+        <span className="bg-muted text-muted-foreground ml-0.5 rounded px-1.5 py-0.5 text-[0.625rem] font-medium">
+          Yakında
         </span>
       </TooltipTrigger>
       <TooltipContent>{hint}</TooltipContent>

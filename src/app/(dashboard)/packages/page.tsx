@@ -9,10 +9,10 @@ export default function PackagesPage() {
   return (
     <PlaceholderPage
       title="Sponsorluk Paketleri"
-      description="Altın, gümüş ve özel paket tanımlarını ve haklarını burada yöneteceksin."
+      description="Sponsorluk seviyelerini ve sağlanan avantajları buradan yöneteceksin."
       icon={PackageIcon}
       emptyTitle="Henüz paket tanımlanmamış."
-      emptyDescription="Standart paketlerini oluşturarak tekliflerini hızlandır."
+      emptyDescription="Platinum, Gold, Silver ve ürün sponsoru gibi paketlerini tanımlayarak tekliflerini hızlandır."
     />
   )
 }

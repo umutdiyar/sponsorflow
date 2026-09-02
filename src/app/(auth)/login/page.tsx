@@ -21,19 +21,19 @@ export default async function LoginPage({
     next && next.startsWith("/") && !next.startsWith("//") ? next : undefined
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-2">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
           Tekrar hoş geldin
         </h1>
         <p className="text-muted-foreground text-sm">
-          Hesabına giriş yaparak devam et.
+          Sponsorluk ekibi hesabınla devam et.
         </p>
       </div>
 
       <LoginForm next={safeNext} />
 
-      <p className="text-muted-foreground text-xs leading-relaxed">
+      <p className="text-muted-foreground border-t pt-5 text-xs leading-relaxed">
         Bu panel yalnızca yetkilendirilmiş ekip üyeleri içindir.
       </p>
     </div>

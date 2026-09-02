@@ -25,7 +25,11 @@ export const metadata: Metadata = {
   description: "Sponsorluk süreçlerinizi tek noktadan yönetin.",
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html
       lang="tr"

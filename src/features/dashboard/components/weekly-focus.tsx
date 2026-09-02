@@ -8,7 +8,7 @@ type WeeklyFocusProps = {
 /**
  * Compact progress panel for the "focus on N target companies this week"
  * working method. Kept deliberately small — it's a summary, not an analytics
- * widget — and shaped so it can later bind to real Campaign/Sprint data.
+ * widget — and shaped so it can later bind to real Sprint/period data.
  */
 export function WeeklyFocus({ data }: WeeklyFocusProps) {
   const lead = data.steps[0]?.count ?? 0

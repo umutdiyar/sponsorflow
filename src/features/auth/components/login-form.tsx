@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useId, useState, useTransition } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertCircleIcon, Loader2Icon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signIn } from "@/features/auth/actions"
@@ -16,30 +17,34 @@ type LoginFormProps = {
   next?: string
 }
 
+type Credentials = Pick<LoginInput, "email" | "password">
+
 export function LoginForm({ next }: LoginFormProps) {
+  const rememberId = useId()
   const [isPending, startTransition] = useTransition()
   const [formError, setFormError] = useState<string | null>(null)
+  const [remember, setRemember] = useState(true)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<Credentials>({
+    resolver: zodResolver(loginSchema.pick({ email: true, password: true })),
     defaultValues: { email: "", password: "" },
   })
 
   const onSubmit = handleSubmit((values) => {
     setFormError(null)
     startTransition(async () => {
-      const result = await signIn({ ...values, next })
+      const result = await signIn({ ...values, remember, next })
       // A successful sign-in redirects server-side and never returns here.
       if (result?.error) setFormError(result.error)
     })
   })
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       {formError ? (
         <div
           role="alert"
@@ -50,7 +55,7 @@ export function LoginForm({ next }: LoginFormProps) {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">E-posta</Label>
         <Input
           id="email"
@@ -58,6 +63,7 @@ export function LoginForm({ next }: LoginFormProps) {
           autoComplete="email"
           autoFocus
           placeholder="ad.soyad@ornek.com"
+          className="h-10"
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           disabled={isPending}
@@ -70,7 +76,7 @@ export function LoginForm({ next }: LoginFormProps) {
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Şifre</Label>
           <Link
@@ -85,6 +91,7 @@ export function LoginForm({ next }: LoginFormProps) {
           type="password"
           autoComplete="current-password"
           placeholder="••••••••"
+          className="h-10"
           aria-invalid={Boolean(errors.password)}
           aria-describedby={errors.password ? "password-error" : undefined}
           disabled={isPending}
@@ -97,12 +104,24 @@ export function LoginForm({ next }: LoginFormProps) {
         ) : null}
       </div>
 
+      <div className="flex items-center gap-2 py-1">
+        <Checkbox
+          id={rememberId}
+          checked={remember}
+          onCheckedChange={(value) => setRemember(value === true)}
+          disabled={isPending}
+        />
+        <Label htmlFor={rememberId} className="text-sm font-normal">
+          Beni hatırla
+        </Label>
+      </div>
+
       <Button
         type="submit"
         size="lg"
         disabled={isPending}
         aria-busy={isPending}
-        className="mt-1 w-full"
+        className="mt-1 h-10 w-full"
       >
         {isPending ? (
           <>

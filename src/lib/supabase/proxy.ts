@@ -2,6 +2,11 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 
 import { getSupabaseConfig } from "@/lib/env"
+import {
+  applyPersistence,
+  parseRemember,
+  REMEMBER_COOKIE,
+} from "@/lib/auth/persistence"
 
 /** Route prefixes that never require authentication. */
 const PUBLIC_ROUTES = ["/login", "/forgot-password", "/auth"]
@@ -44,6 +49,7 @@ export async function updateSession(request: NextRequest) {
 
   let response = NextResponse.next({ request })
 
+  const remember = parseRemember(request.cookies.get(REMEMBER_COOKIE)?.value)
   const { url, publishableKey } = getSupabaseConfig()
   const supabase = createServerClient(url, publishableKey, {
     cookies: {
@@ -51,11 +57,12 @@ export async function updateSession(request: NextRequest) {
         return request.cookies.getAll()
       },
       setAll(cookiesToSet) {
-        for (const { name, value } of cookiesToSet) {
+        const toSet = applyPersistence(cookiesToSet, remember)
+        for (const { name, value } of toSet) {
           request.cookies.set(name, value)
         }
         response = NextResponse.next({ request })
-        for (const { name, value, options } of cookiesToSet) {
+        for (const { name, value, options } of toSet) {
           response.cookies.set(name, value, options)
         }
       },

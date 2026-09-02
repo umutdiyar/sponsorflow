@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/dal"
-import { CURRENT_ORGANIZATION } from "@/lib/organization"
+import { getCurrentMembership } from "@/lib/auth/membership"
 import { AppShell } from "@/components/layout/app-shell"
 
 export default async function DashboardLayout({
@@ -7,10 +7,19 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const user = await requireUser()
+  const [user, membership] = await Promise.all([
+    requireUser(),
+    getCurrentMembership(),
+  ])
 
   return (
-    <AppShell user={user} orgName={CURRENT_ORGANIZATION.name}>
+    <AppShell
+      user={{ ...user, role: membership.roleLabel }}
+      org={{
+        name: membership.organization.name,
+        subtitle: "Istanbul Okan University",
+      }}
+    >
       {children}
     </AppShell>
   )

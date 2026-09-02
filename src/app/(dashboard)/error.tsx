@@ -15,11 +15,18 @@ export default function DashboardError({
     console.error(error)
   }, [error])
 
+  const isForbidden = error.name === "ForbiddenError"
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 sm:p-6">
       <ErrorState
-        description="Bu sayfa yüklenirken bir hata oluştu. Tekrar denemeyi seçebilir ya da daha sonra kontrol edebilirsin."
-        onRetry={reset}
+        title={isForbidden ? "Erişim yetkin yok" : "Bir şeyler ters gitti"}
+        description={
+          isForbidden
+            ? "Bu sayfayı görüntülemek için gereken yetkiye sahip değilsin. Ekip liderinle iletişime geç."
+            : "Bu sayfa yüklenirken bir hata oluştu. Tekrar denemeyi seçebilir ya da daha sonra kontrol edebilirsin."
+        }
+        onRetry={isForbidden ? undefined : reset}
       />
       {process.env.NODE_ENV === "development" ? (
         <pre className="bg-muted text-muted-foreground max-h-48 overflow-auto rounded-md p-3 text-left text-xs whitespace-pre-wrap">

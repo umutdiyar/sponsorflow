@@ -16,7 +16,7 @@ function Row({ label, value }: { label: string; value: string }) {
  * Account details, read from the already-validated user in context — no extra
  * `getUser()` round-trip on navigation to Settings.
  */
-export function AccountPanel() {
+export function AccountPanel({ roleLabel }: { roleLabel: string }) {
   const user = useCurrentUser()
 
   return (
@@ -25,7 +25,7 @@ export function AccountPanel() {
       <PanelContent className="divide-border divide-y py-1">
         <Row label="Ad" value={user.name} />
         <Row label="E-posta" value={user.email} />
-        <Row label="Rol" value={user.role} />
+        <Row label="Rol" value={roleLabel} />
       </PanelContent>
     </Panel>
   )

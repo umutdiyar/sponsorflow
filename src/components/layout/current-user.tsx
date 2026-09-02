@@ -21,9 +21,9 @@ export function CurrentUserProvider({
 }
 
 /**
- * The authenticated user, already validated by `requireUser()` in the dashboard
- * layout and passed down. Lets nested pages show account details without a
- * second `getUser()` round-trip.
+ * The authenticated user, already validated by `requireUser()` +
+ * `getCurrentMembership()` in the dashboard layout and passed down. Lets nested
+ * pages read account/role details without another round-trip.
  */
 export function useCurrentUser(): SessionUser {
   const user = useContext(CurrentUserContext)

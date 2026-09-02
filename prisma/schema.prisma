@@ -1,7 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// SponsorFlow domain schema — CRM foundation.
+//
+// Authentication lives in Supabase (`auth.users`) and is NOT modelled here.
+// `Profile.id` holds the Supabase Auth user UUID; the app provisions a Profile
+// + OrganizationMembership on first authenticated request.
+//
+// Prisma Client is generated to `src/generated/prisma` and used via the
+// `@prisma/adapter-pg` driver adapter (see `src/lib/db/prisma.ts`).
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +14,176 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+
+/// Platform-wide capability, independent of any organization.
+enum PlatformRole {
+  USER
+  SUPER_ADMIN
+}
+
+/// A member's role within one organization.
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  SPONSORSHIP_LEAD
+  MEMBER
+  VIEWER
+}
+
+/// Semantic classification of a pipeline stage.
+enum PipelineStageType {
+  OPEN
+  WON
+  LOST
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+/// Application-level user profile. `id` == Supabase Auth user UUID.
+/// `email` is denormalized from auth purely for display/sorting; auth remains
+/// the source of truth and it is refreshed on login.
+model Profile {
+  id           String       @id
+  email        String       @unique
+  fullName     String?
+  avatarUrl    String?
+  platformRole PlatformRole @default(USER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  memberships OrganizationMembership[]
+}
+
+// ---------------------------------------------------------------------------
+// Tenant
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    OrganizationMembership[]
+  pipelineStages PipelineStage[]
+  companies      Company[]
+  contacts       Contact[]
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  profileId      String
+  role           OrganizationRole @default(MEMBER)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profile      Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  ownedCompanies   Company[] @relation("CompanyOwner")
+  createdCompanies Company[] @relation("CompanyCreatedBy")
+  createdContacts  Contact[] @relation("ContactCreatedBy")
+
+  @@unique([organizationId, profileId])
+  @@index([profileId])
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline configuration (org-level)
+// ---------------------------------------------------------------------------
+
+model PipelineStage {
+  id             String            @id @default(cuid())
+  organizationId String
+  name           String
+  key            String
+  position       Int
+  type           PipelineStageType @default(OPEN)
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId, position])
+}
+
+// ---------------------------------------------------------------------------
+// CRM entities
+// ---------------------------------------------------------------------------
+
+model Company {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name        String
+  legalName   String?
+  website     String?
+  domain      String?
+  industry    String?
+  description String?
+  linkedinUrl String?
+
+  city    String?
+  country String?
+
+  source String?
+  score  Int?
+
+  ownerMembershipId     String?
+  createdByMembershipId String
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        OrganizationMembership? @relation("CompanyOwner", fields: [ownerMembershipId], references: [id], onDelete: SetNull)
+  createdBy    OrganizationMembership  @relation("CompanyCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+
+  contacts Contact[]
+
+  @@index([organizationId, archivedAt])
+  @@index([organizationId, createdAt])
+  @@index([ownerMembershipId])
+}
+
+model Contact {
+  id             String @id @default(cuid())
+  organizationId String
+  companyId      String
+
+  firstName   String
+  lastName    String
+  jobTitle    String?
+  department  String?
+  email       String?
+  phone       String?
+  linkedinUrl String?
+  notes       String?
+  isPrimary   Boolean @default(false)
+
+  createdByMembershipId String
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy    OrganizationMembership @relation("ContactCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, companyId, archivedAt])
+  @@index([companyId])
 }

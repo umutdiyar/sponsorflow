@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { CURRENT_ORGANIZATION } from "@/lib/organization"
+import { getCurrentMembership } from "@/lib/auth/membership"
 import { PageHeader } from "@/components/common/page-header"
 import { Panel, PanelHeader, PanelContent } from "@/components/common/panel"
 import { AccountPanel } from "@/features/settings/components/account-panel"
@@ -16,7 +16,9 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const membership = await getCurrentMembership()
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
@@ -24,13 +26,14 @@ export default function SettingsPage() {
         description="Hesap ve organizasyon bilgilerini buradan yöneteceksin."
       />
 
-      <AccountPanel />
+      <AccountPanel roleLabel={membership.roleLabel} />
 
       <Panel>
         <PanelHeader title="Organizasyon" description="Aktif çalışma alanın" />
         <PanelContent className="divide-border divide-y py-1">
-          <Row label="Organizasyon" value={CURRENT_ORGANIZATION.name} />
-          <Row label="Kısa ad" value={CURRENT_ORGANIZATION.shortName} />
+          <Row label="Organizasyon" value={membership.organization.name} />
+          <Row label="Kısa ad" value={membership.organization.slug} />
+          <Row label="Rolün" value={membership.roleLabel} />
         </PanelContent>
       </Panel>
 
