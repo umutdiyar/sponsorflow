@@ -1,6 +1,15 @@
 import "server-only"
 
 import { prisma } from "@/lib/db/prisma"
+import { istanbulDayKey, parseIstanbulDate } from "@/lib/format"
+import { getCurrentFocusCompanyIds } from "@/features/weekly-focus/queries"
+
+export type CompanyQuickFilter =
+  | "all"
+  | "mine"
+  | "unassigned"
+  | "followup"
+  | "focus"
 
 export type CompanyListSort =
   | "name"
@@ -65,20 +74,54 @@ export async function listOrgMembers(
 
 type ListCompaniesParams = {
   organizationId: string
+  currentMembershipId: string
   q?: string
   industry?: string
-  ownerMembershipId?: string
+  /** A membership id, or "unassigned" / "me". */
+  owner?: string
+  filter?: CompanyQuickFilter
   sort?: CompanyListSort
 }
 
-export async function listCompanies({
-  organizationId,
-  q,
-  industry,
-  ownerMembershipId,
-  sort = "-updated",
-}: ListCompaniesParams) {
+async function resolveFilterWhere(params: ListCompaniesParams) {
+  const where: Record<string, unknown> = {}
+
+  // Owner (from the select filter or a quick filter).
+  const owner = params.owner
+  if (owner === "unassigned" || params.filter === "unassigned") {
+    where.ownerMembershipId = null
+  } else if (owner === "me" || params.filter === "mine") {
+    where.ownerMembershipId = params.currentMembershipId
+  } else if (owner) {
+    where.ownerMembershipId = owner
+  }
+
+  if (params.filter === "followup") {
+    const todayStart = parseIstanbulDate(istanbulDayKey(new Date()))!
+    const rows = await prisma.opportunity.findMany({
+      where: {
+        organizationId: params.organizationId,
+        archivedAt: null,
+        nextActionAt: { lt: todayStart },
+      },
+      select: { companyId: true },
+      distinct: ["companyId"],
+    })
+    where.id = { in: rows.map((r) => r.companyId) }
+  }
+
+  if (params.filter === "focus") {
+    const ids = await getCurrentFocusCompanyIds(params.organizationId)
+    where.id = { in: ids }
+  }
+
+  return where
+}
+
+export async function listCompanies(params: ListCompaniesParams) {
+  const { organizationId, q, industry, sort = "-updated" } = params
   const trimmedQ = q?.trim()
+  const filterWhere = await resolveFilterWhere(params)
 
   const rows = await prisma.company.findMany({
     where: {
@@ -88,7 +131,7 @@ export async function listCompanies({
         ? { name: { contains: trimmedQ, mode: "insensitive" } }
         : {}),
       ...(industry ? { industry } : {}),
-      ...(ownerMembershipId ? { ownerMembershipId } : {}),
+      ...filterWhere,
     },
     select: {
       id: true,
@@ -142,8 +185,9 @@ export async function getCompaniesPageData(
   companies: CompanyRow[]
   industries: string[]
   members: MemberOption[]
+  hasFocus: boolean
 }> {
-  const [companies, industryRows, members] = await Promise.all([
+  const [companies, industryRows, members, focusIds] = await Promise.all([
     listCompanies(params),
     prisma.company.findMany({
       where: {
@@ -156,6 +200,7 @@ export async function getCompaniesPageData(
       orderBy: { industry: "asc" },
     }),
     listOrgMembers(params.organizationId),
+    getCurrentFocusCompanyIds(params.organizationId),
   ])
 
   return {
@@ -164,6 +209,7 @@ export async function getCompaniesPageData(
       .map((r) => r.industry)
       .filter((v): v is string => Boolean(v)),
     members,
+    hasFocus: focusIds.length > 0,
   }
 }
 

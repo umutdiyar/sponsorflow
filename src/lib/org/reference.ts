@@ -1,5 +1,7 @@
 import "server-only"
 
+import { cache } from "react"
+
 import { prisma } from "@/lib/db/prisma"
 import type { PipelineStageType } from "@/generated/prisma/enums"
 
@@ -24,7 +26,7 @@ function memberName(profile: { fullName: string | null; email: string }) {
   return profile.fullName?.trim() || profile.email
 }
 
-export async function listMembers(
+export const listMembers = cache(async function listMembers(
   organizationId: string
 ): Promise<MemberRef[]> {
   const rows = await prisma.organizationMembership.findMany({
@@ -39,9 +41,9 @@ export async function listMembers(
     membershipId: r.id,
     name: memberName(r.profile),
   }))
-}
+})
 
-export async function listStages(
+export const listStages = cache(async function listStages(
   organizationId: string
 ): Promise<StageRef[]> {
   const rows = await prisma.pipelineStage.findMany({
@@ -50,9 +52,9 @@ export async function listStages(
     orderBy: { position: "asc" },
   })
   return rows
-}
+})
 
-export async function listActivePackages(
+export const listActivePackages = cache(async function listActivePackages(
   organizationId: string
 ): Promise<PackageRef[]> {
   const rows = await prisma.sponsorshipPackage.findMany({
@@ -61,9 +63,9 @@ export async function listActivePackages(
     orderBy: { position: "asc" },
   })
   return rows
-}
+})
 
-export async function listCompanyOptions(
+export const listCompanyOptions = cache(async function listCompanyOptions(
   organizationId: string
 ): Promise<CompanyRef[]> {
   const rows = await prisma.company.findMany({
@@ -73,7 +75,7 @@ export async function listCompanyOptions(
     take: 1000,
   })
   return rows
-}
+})
 
 export type ContactOptionRef = {
   id: string

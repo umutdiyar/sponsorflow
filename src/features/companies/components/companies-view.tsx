@@ -51,7 +51,8 @@ type CompaniesViewProps = {
   companies: CompanyRow[]
   industries: string[]
   members: MemberOption[]
-  filters: { q: string; industry: string; owner: string }
+  hasFocus: boolean
+  filters: { q: string; industry: string; owner: string; filter: string }
   can: {
     create: boolean
     update: boolean
@@ -60,6 +61,14 @@ type CompaniesViewProps = {
     logActivity: boolean
   }
 }
+
+const QUICK_FILTERS = [
+  { key: "all", label: "Tümü" },
+  { key: "mine", label: "Bana Atanan" },
+  { key: "unassigned", label: "Atanmamış" },
+  { key: "followup", label: "Takip Gereken" },
+  { key: "focus", label: "Bu Haftanın Odağı" },
+] as const
 
 type ColKey = "industry" | "owner" | "source" | "location" | "updated"
 
@@ -84,6 +93,7 @@ export function CompaniesView({
   companies,
   industries,
   members,
+  hasFocus,
   filters,
   can,
 }: CompaniesViewProps) {
@@ -211,7 +221,30 @@ export function CompaniesView({
     })
   }
 
-  const hasFilters = Boolean(filters.q || filters.industry || filters.owner)
+  const activeQuick =
+    filters.filter && filters.filter !== "all"
+      ? filters.filter
+      : filters.owner === "unassigned"
+        ? "unassigned"
+        : filters.owner === "me"
+          ? "mine"
+          : "all"
+
+  function setQuickFilter(key: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("owner")
+    params.delete("new")
+    if (key && key !== "all") params.set("filter", key)
+    else params.delete("filter")
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  const hasFilters = Boolean(
+    filters.q ||
+      filters.industry ||
+      (filters.owner && filters.owner !== "me" && filters.owner !== "unassigned") ||
+      activeQuick !== "all"
+  )
   const allSelected = rows.length > 0 && selected.size === rows.length
 
   const show = (key: ColKey) => !hidden.has(key)
@@ -235,6 +268,27 @@ export function CompaniesView({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Quick filters */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {QUICK_FILTERS.filter(
+          (f) => f.key !== "focus" || hasFocus
+        ).map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setQuickFilter(f.key)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              activeQuick === f.key
+                ? "border-brand bg-brand-muted text-brand-foreground"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-52 flex-1">
@@ -375,7 +429,7 @@ export function CompaniesView({
           <EmptyState
             icon={Building2Icon}
             title="Henüz firma eklenmemiş."
-            description="İlk firmayı ekleyerek sponsorluk sürecini başlat."
+            description="İlk firmanı ekleyerek başla."
             action={
               can.create ? (
                 <Button onClick={() => setCreateOpen(true)}>

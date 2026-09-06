@@ -7,6 +7,7 @@ import { CompaniesView } from "@/features/companies/components/companies-view"
 import {
   getCompaniesPageData,
   type CompanyListSort,
+  type CompanyQuickFilter,
 } from "@/features/companies/queries"
 
 export const metadata: Metadata = { title: "Firmalar" }
@@ -20,6 +21,14 @@ const VALID_SORTS = new Set<CompanyListSort>([
   "-created",
 ])
 
+const VALID_FILTERS = new Set<CompanyQuickFilter>([
+  "all",
+  "mine",
+  "unassigned",
+  "followup",
+  "focus",
+])
+
 export default async function CompaniesPage({
   searchParams,
 }: {
@@ -27,6 +36,7 @@ export default async function CompaniesPage({
     q?: string
     industry?: string
     owner?: string
+    filter?: string
     sort?: string
   }>
 }) {
@@ -38,13 +48,21 @@ export default async function CompaniesPage({
       ? (sp.sort as CompanyListSort)
       : "-updated"
 
-  const { companies, industries, members } = await getCompaniesPageData({
-    organizationId: membership.organizationId,
-    q: sp.q,
-    industry: sp.industry,
-    ownerMembershipId: sp.owner,
-    sort,
-  })
+  const filter =
+    sp.filter && VALID_FILTERS.has(sp.filter as CompanyQuickFilter)
+      ? (sp.filter as CompanyQuickFilter)
+      : "all"
+
+  const { companies, industries, members, hasFocus } =
+    await getCompaniesPageData({
+      organizationId: membership.organizationId,
+      currentMembershipId: membership.membershipId,
+      q: sp.q,
+      industry: sp.industry,
+      owner: sp.owner,
+      filter,
+      sort,
+    })
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
@@ -57,10 +75,12 @@ export default async function CompaniesPage({
         companies={companies}
         industries={industries}
         members={members}
+        hasFocus={hasFocus}
         filters={{
           q: sp.q ?? "",
           industry: sp.industry ?? "",
           owner: sp.owner ?? "",
+          filter,
         }}
         can={{
           create: hasPermission(membership.role, "company:create"),

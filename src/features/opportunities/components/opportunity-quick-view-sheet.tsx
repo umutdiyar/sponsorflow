@@ -159,7 +159,7 @@ export function OpportunityQuickViewSheet({
                   {can.createActivity ? (
                     <Button size="sm" onClick={() => setLogOpen(true)}>
                       <PlusIcon />
-                      İletişim Ekle
+                      İletişim Kaydet
                     </Button>
                   ) : null}
                   {can.createTask ? (

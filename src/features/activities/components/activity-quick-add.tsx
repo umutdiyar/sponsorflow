@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Loader2Icon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ChevronDownIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
 
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,8 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { toLocalInputValue } from "@/lib/format"
+import { addDaysToKey, istanbulDayKey, toLocalInputValue } from "@/lib/format"
 import { logActivity } from "@/features/activities/actions"
+import { updateNextAction } from "@/features/opportunities/actions"
 import {
   ACTIVITY_CHANNELS,
   ACTIVITY_CHANNEL_LABELS,
@@ -41,12 +44,60 @@ export type ActivityContactOption = {
 
 type LoggableKind = (typeof LOGGABLE_KINDS)[number]
 
+type Preset = {
+  label: string
+  channel: ActivityChannel
+  kind: LoggableKind
+  direction: ActivityDirection
+}
+
+const PRESETS: Preset[] = [
+  {
+    label: "LinkedIn · İlk Temas",
+    channel: "LINKEDIN",
+    kind: "INITIAL_CONTACT",
+    direction: "OUTBOUND",
+  },
+  {
+    label: "E-posta · İlk Temas",
+    channel: "EMAIL",
+    kind: "INITIAL_CONTACT",
+    direction: "OUTBOUND",
+  },
+  {
+    label: "E-posta · Takip",
+    channel: "EMAIL",
+    kind: "FOLLOW_UP",
+    direction: "OUTBOUND",
+  },
+  {
+    label: "LinkedIn · Takip",
+    channel: "LINKEDIN",
+    kind: "FOLLOW_UP",
+    direction: "OUTBOUND",
+  },
+  {
+    label: "Telefon · Görüşme",
+    channel: "PHONE",
+    kind: "MEETING_NOTE",
+    direction: "OUTBOUND",
+  },
+  {
+    label: "Gelen Yanıt",
+    channel: "EMAIL",
+    kind: "RESPONSE",
+    direction: "INBOUND",
+  },
+]
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   opportunityId?: string
   companyId?: string
   contacts?: ActivityContactOption[]
+  /** Preselect a contact when the dialog opens (e.g. from the contacts list). */
+  defaultContactId?: string
   onLogged: (activity: ActivityListItem) => void
 }
 
@@ -59,14 +110,20 @@ export function QuickLogCommunication({
   opportunityId,
   companyId,
   contacts = [],
+  defaultContactId,
   onLogged,
 }: Props) {
+  const router = useRouter()
   const [channel, setChannel] = useState<ActivityChannel>("EMAIL")
   const [direction, setDirection] = useState<ActivityDirection>("OUTBOUND")
   const [kind, setKind] = useState<LoggableKind>("INITIAL_CONTACT")
   const [contactId, setContactId] = useState("")
   const [occurredAt, setOccurredAt] = useState("")
   const [description, setDescription] = useState("")
+  const [showMore, setShowMore] = useState(false)
+  const [followUp, setFollowUp] = useState(false)
+  const [followNote, setFollowNote] = useState("")
+  const [followDate, setFollowDate] = useState("")
   const [isPending, startTransition] = useTransition()
 
   const [prevOpen, setPrevOpen] = useState(open)
@@ -76,14 +133,35 @@ export function QuickLogCommunication({
       setChannel("EMAIL")
       setDirection("OUTBOUND")
       setKind("INITIAL_CONTACT")
-      setContactId("")
+      setContactId(defaultContactId ?? "")
       setOccurredAt(toLocalInputValue(new Date()))
       setDescription("")
+      setShowMore(false)
+      setFollowUp(false)
+      setFollowNote("")
+      setFollowDate(addDaysToKey(istanbulDayKey(new Date()), 3))
     }
   }
 
   const isInternal = channel === "INTERNAL"
   const selectedContact = contacts.find((c) => c.id === contactId)
+
+  function applyPreset(p: Preset) {
+    setChannel(p.channel)
+    setKind(p.kind)
+    setDirection(p.direction)
+  }
+
+  // Smart defaults: switching channel/kind nudges the direction.
+  function onChannelChange(c: ActivityChannel) {
+    setChannel(c)
+    if (c === "INTERNAL") setDirection("INTERNAL")
+    else if (direction === "INTERNAL") setDirection("OUTBOUND")
+  }
+  function onKindChange(k: LoggableKind) {
+    setKind(k)
+    if (k === "RESPONSE") setDirection("INBOUND")
+  }
 
   function onSubmit() {
     startTransition(async () => {
@@ -97,13 +175,28 @@ export function QuickLogCommunication({
         contactId: contactId || undefined,
         description: description || undefined,
       })
-      if (result.ok) {
-        toast.success("İletişim kaydedildi.")
-        onLogged(result.activity)
-        onOpenChange(false)
-      } else {
+      if (!result.ok) {
         toast.error(result.error)
+        return
       }
+
+      if (followUp && opportunityId && followNote.trim()) {
+        const fu = await updateNextAction(opportunityId, {
+          nextAction: followNote.trim(),
+          nextActionAt: followDate || undefined,
+        })
+        toast.success(
+          fu.ok
+            ? "İletişim kaydedildi ve takip planlandı."
+            : "İletişim kaydedildi (takip planlanamadı)."
+        )
+        if (fu.ok) router.refresh()
+      } else {
+        toast.success("İletişim kaydedildi.")
+      }
+
+      onLogged(result.activity)
+      onOpenChange(false)
     })
   }
 
@@ -111,14 +204,39 @@ export function QuickLogCommunication({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>İletişim ekle</DialogTitle>
+          <DialogTitle>İletişim kaydet</DialogTitle>
           <DialogDescription>
-            Yapılan bir görüşmeyi, mesajı veya notu kaydet. E-posta / LinkedIn
-            türü mesaj göndermez — yalnızca kayıt oluşturur.
+            Yapılan bir görüşmeyi, mesajı veya notu kaydet. Mesaj göndermez —
+            yalnızca kayıt oluşturur.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
+          {/* Presets */}
+          <div className="flex flex-wrap gap-1.5">
+            {PRESETS.map((p) => {
+              const active =
+                p.channel === channel &&
+                p.kind === kind &&
+                p.direction === (isInternal ? "INTERNAL" : direction)
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    active
+                      ? "border-brand bg-brand-muted text-brand-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  {p.label}
+                </button>
+              )
+            })}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Kanal</span>
@@ -126,7 +244,7 @@ export function QuickLogCommunication({
                 className={selectClass}
                 value={channel}
                 onChange={(e) =>
-                  setChannel(e.target.value as ActivityChannel)
+                  onChannelChange(e.target.value as ActivityChannel)
                 }
               >
                 {ACTIVITY_CHANNELS.map((c) => (
@@ -136,40 +254,21 @@ export function QuickLogCommunication({
                 ))}
               </select>
             </label>
-
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Yön</span>
+              <span className="font-medium">Tür</span>
               <select
                 className={selectClass}
-                value={isInternal ? "INTERNAL" : direction}
-                disabled={isInternal}
-                onChange={(e) =>
-                  setDirection(e.target.value as ActivityDirection)
-                }
+                value={kind}
+                onChange={(e) => onKindChange(e.target.value as LoggableKind)}
               >
-                {ACTIVITY_DIRECTIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {ACTIVITY_DIRECTION_LABELS[d]}
+                {LOGGABLE_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {ACTIVITY_KIND_LABELS[k]}
                   </option>
                 ))}
               </select>
             </label>
           </div>
-
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Tür</span>
-            <select
-              className={selectClass}
-              value={kind}
-              onChange={(e) => setKind(e.target.value as LoggableKind)}
-            >
-              {LOGGABLE_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {ACTIVITY_KIND_LABELS[k]}
-                </option>
-              ))}
-            </select>
-          </label>
 
           {contacts.length > 0 ? (
             <label className="flex flex-col gap-1.5 text-sm">
@@ -202,24 +301,89 @@ export function QuickLogCommunication({
           ) : null}
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Tarih ve saat</span>
-            <Input
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Not</span>
             <Textarea
-              rows={4}
+              rows={3}
               autoFocus
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Konuşulanlar, sonraki adımlar…"
             />
           </label>
+
+          {/* Advanced */}
+          <button
+            type="button"
+            onClick={() => setShowMore((v) => !v)}
+            className="text-muted-foreground hover:text-foreground -mb-1 flex w-fit items-center gap-1 text-xs font-medium"
+          >
+            <ChevronDownIcon
+              className={cn("size-3.5 transition-transform", showMore && "rotate-180")}
+            />
+            Diğer ayrıntılar
+          </button>
+          {showMore ? (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Yön</span>
+                <select
+                  className={selectClass}
+                  value={isInternal ? "INTERNAL" : direction}
+                  disabled={isInternal}
+                  onChange={(e) =>
+                    setDirection(e.target.value as ActivityDirection)
+                  }
+                >
+                  {ACTIVITY_DIRECTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {ACTIVITY_DIRECTION_LABELS[d]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Tarih ve saat</span>
+                <Input
+                  type="datetime-local"
+                  value={occurredAt}
+                  onChange={(e) => setOccurredAt(e.target.value)}
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {/* Follow-up (only meaningful when tied to an opportunity) */}
+          {opportunityId ? (
+            <div className="border-t pt-3">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={followUp}
+                  onChange={(e) => setFollowUp(e.target.checked)}
+                  className="size-4"
+                />
+                Takip planla
+              </label>
+              {followUp ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  <Input
+                    value={followNote}
+                    onChange={(e) => setFollowNote(e.target.value)}
+                    placeholder="Örn. Teklif dokümanını gönder"
+                  />
+                  <Input
+                    type="date"
+                    value={followDate}
+                    onChange={(e) => setFollowDate(e.target.value)}
+                    className="w-40"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Fırsatın “sonraki aksiyonu” olarak kaydedilir.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

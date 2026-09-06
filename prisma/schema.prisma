@@ -94,6 +94,11 @@ enum InvitationStatus {
   EXPIRED
 }
 
+/// What a bulk import brought in.
+enum DataImportType {
+  COMPANY
+}
+
 /// How urgent a task is.
 enum TaskPriority {
   LOW
@@ -150,6 +155,8 @@ model Organization {
   tasks               Task[]
   sponsorshipPackages SponsorshipPackage[]
   invitations         OrganizationInvitation[]
+  weeklyFocuses       WeeklyFocus[]
+  dataImports         DataImport[]
 }
 
 model OrganizationMembership {
@@ -176,6 +183,8 @@ model OrganizationMembership {
   assignedTasks        Task[]                   @relation("TaskAssignee")
   createdTasks         Task[]                   @relation("TaskCreatedBy")
   sentInvitations      OrganizationInvitation[] @relation("InvitationInvitedBy")
+  createdWeeklyFocuses WeeklyFocus[]            @relation("WeeklyFocusCreatedBy")
+  createdDataImports   DataImport[]             @relation("DataImportCreatedBy")
 
   @@unique([organizationId, profileId])
   @@index([profileId])
@@ -270,6 +279,7 @@ model Company {
   opportunities Opportunity[]
   activities    Activity[]
   tasks         Task[]
+  weeklyFocuses WeeklyFocusCompany[]
 
   @@index([organizationId, archivedAt])
   @@index([organizationId, createdAt])
@@ -460,4 +470,71 @@ model Task {
   @@index([assignedToMembershipId, status])
   @@index([opportunityId])
   @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// Weekly focus — "this week we chase these companies"
+// ---------------------------------------------------------------------------
+
+/// A lightweight weekly target list. NOT a campaign / project model — just a
+/// named set of companies with a date window. Progress (contacted / replied /
+/// meeting) is derived from Activity + Opportunity data, never stored here.
+model WeeklyFocus {
+  id             String @id @default(cuid())
+  organizationId String
+
+  title              String
+  startDate          DateTime
+  endDate            DateTime
+  targetCompanyCount Int?
+
+  createdByMembershipId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    OrganizationMembership @relation("WeeklyFocusCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  companies    WeeklyFocusCompany[]
+
+  @@index([organizationId, startDate])
+}
+
+model WeeklyFocusCompany {
+  focusId   String
+  companyId String
+  addedAt   DateTime @default(now())
+
+  focus   WeeklyFocus @relation(fields: [focusId], references: [id], onDelete: Cascade)
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([focusId, companyId])
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// Bulk import history
+// ---------------------------------------------------------------------------
+
+/// One record per completed import run. Row-level history / rollback are not
+/// modelled in this version.
+model DataImport {
+  id             String @id @default(cuid())
+  organizationId String
+
+  fileName     String
+  type         DataImportType @default(COMPANY)
+  totalRows    Int
+  importedRows Int            @default(0)
+  updatedRows  Int            @default(0)
+  skippedRows  Int            @default(0)
+  failedRows   Int            @default(0)
+
+  createdByMembershipId String
+  createdAt             DateTime @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    OrganizationMembership @relation("DataImportCreatedBy", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
 }

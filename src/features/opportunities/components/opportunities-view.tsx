@@ -237,7 +237,7 @@ export function OpportunitiesView({
           <EmptyState
             icon={TargetIcon}
             title="Henüz fırsat oluşturulmamış."
-            description="Bir firmayla ilk teması kurduğunda fırsat oluşturarak süreci başlat."
+            description="İlk sponsorluk fırsatını oluştur."
             action={
               canCreate ? (
                 <Button onClick={() => setCreateOpen(true)}>

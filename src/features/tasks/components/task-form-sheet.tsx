@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2Icon } from "lucide-react"
+import { ChevronDownIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
+
+import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -91,6 +93,7 @@ export function TaskFormSheet({
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [showMore, setShowMore] = useState(false)
   const isEdit = Boolean(task)
 
   const {
@@ -109,6 +112,24 @@ export function TaskFormSheet({
     if (open) reset(toDefaults(task, defaults))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task])
+
+  // Expand "Diğer ayrıntılar" on open when those fields already carry values.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setShowMore(
+        Boolean(
+          task?.description ||
+            task?.companyId ||
+            task?.opportunityId ||
+            (task && task.status !== "TODO") ||
+            defaults?.companyId ||
+            defaults?.opportunityId
+        )
+      )
+    }
+  }
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const selectedOpportunityId = watch("opportunityId")
@@ -167,10 +188,6 @@ export function TaskFormSheet({
               />
             </Field>
 
-            <Field label="Açıklama" error={errors.description?.message}>
-              <Textarea rows={3} {...register("description")} />
-            </Field>
-
             <Field
               label="Sorumlu"
               required
@@ -191,6 +208,9 @@ export function TaskFormSheet({
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
+              <Field label="Son Tarih" error={errors.dueAt?.message}>
+                <Input type="date" {...register("dueAt")} />
+              </Field>
               <Field label="Öncelik">
                 <select className={selectClass} {...register("priority")}>
                   {TASK_PRIORITIES.map((p) => (
@@ -200,46 +220,68 @@ export function TaskFormSheet({
                   ))}
                 </select>
               </Field>
-              <Field label="Durum">
-                <select className={selectClass} {...register("status")}>
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {TASK_STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
             </div>
 
-            <Field label="Fırsat">
-              <select className={selectClass} {...register("opportunityId")}>
-                <option value="">Fırsata bağlı değil</option>
-                {opportunities.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.companyName} — {o.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-xs font-medium"
+            >
+              <ChevronDownIcon
+                className={cn(
+                  "size-3.5 transition-transform",
+                  showMore && "rotate-180"
+                )}
+              />
+              Diğer ayrıntılar
+            </button>
 
-            <Field label="Firma">
-              <select
-                className={selectClass}
-                disabled={Boolean(opportunityCompany)}
-                {...register("companyId")}
-              >
-                <option value="">Firmaya bağlı değil</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {showMore ? (
+              <div className="space-y-4">
+                <Field label="Fırsat">
+                  <select
+                    className={selectClass}
+                    {...register("opportunityId")}
+                  >
+                    <option value="">Fırsata bağlı değil</option>
+                    {opportunities.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.companyName} — {o.title}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-            <Field label="Son Tarih" error={errors.dueAt?.message}>
-              <Input type="date" {...register("dueAt")} />
-            </Field>
+                <Field label="Firma">
+                  <select
+                    className={selectClass}
+                    disabled={Boolean(opportunityCompany)}
+                    {...register("companyId")}
+                  >
+                    <option value="">Firmaya bağlı değil</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Açıklama" error={errors.description?.message}>
+                  <Textarea rows={3} {...register("description")} />
+                </Field>
+
+                <Field label="Durum">
+                  <select className={selectClass} {...register("status")}>
+                    {TASK_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {TASK_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            ) : null}
           </div>
 
           <SheetFooter className="flex-row justify-end border-t">

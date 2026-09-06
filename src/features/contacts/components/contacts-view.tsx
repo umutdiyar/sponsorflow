@@ -7,6 +7,7 @@ import {
   ArchiveIcon,
   Loader2Icon,
   MailIcon,
+  MessageSquarePlusIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PhoneIcon,
@@ -52,6 +53,7 @@ import {
   type ContactFormInput,
 } from "@/features/contacts/schema"
 import { ACTIVITY_CHANNEL_LABELS } from "@/features/activities/schema"
+import { QuickLogCommunication } from "@/features/activities/components/activity-quick-add"
 import type { ContactRow } from "@/features/contacts/queries"
 import type { CompanyRef } from "@/lib/org/reference"
 
@@ -61,7 +63,12 @@ type Props = {
   contacts: ContactRow[]
   companies: CompanyRef[]
   filters: { q: string; company: string }
-  can: { create: boolean; update: boolean; archive: boolean }
+  can: {
+    create: boolean
+    update: boolean
+    archive: boolean
+    logActivity: boolean
+  }
 }
 
 const selectClass =
@@ -76,6 +83,7 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<ContactRow | null>(null)
+  const [logTarget, setLogTarget] = useState<ContactRow | null>(null)
 
   const setParam = useCallback(
     (key: string, value: string) => {
@@ -229,6 +237,16 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                     </td>
                     <td className="hidden px-3 py-2 whitespace-nowrap sm:table-cell">
                       <div className="flex items-center gap-1">
+                        {can.logActivity ? (
+                          <button
+                            type="button"
+                            onClick={() => setLogTarget(c)}
+                            aria-label={`${c.firstName} için iletişim kaydet`}
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1"
+                          >
+                            <MessageSquarePlusIcon className="size-3.5" />
+                          </button>
+                        ) : null}
                         {c.email ? (
                           <a
                             href={`mailto:${c.email}`}
@@ -258,7 +276,10 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                             <PhoneIcon className="size-3.5" />
                           </a>
                         ) : null}
-                        {!c.email && !c.linkedinUrl && !c.phone ? (
+                        {!c.email &&
+                        !c.linkedinUrl &&
+                        !c.phone &&
+                        !can.logActivity ? (
                           <span className="text-muted-foreground">—</span>
                         ) : null}
                       </div>
@@ -282,7 +303,7 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                       {formatDate(c.updatedAt)}
                     </td>
                     <td className="px-3 py-2">
-                    {can.update || can.archive ? (
+                    {can.update || can.archive || can.logActivity ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -293,7 +314,18 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                             <MoreHorizontalIcon />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-44">
+                          {can.logActivity ? (
+                            <DropdownMenuItem
+                              onSelect={() => setLogTarget(c)}
+                            >
+                              <MessageSquarePlusIcon />
+                              İletişim Kaydet
+                            </DropdownMenuItem>
+                          ) : null}
+                          {can.logActivity && (can.update || can.archive) ? (
+                            <DropdownMenuSeparator />
+                          ) : null}
                           {can.update ? (
                             <DropdownMenuItem
                               onSelect={() => setEditTarget(c)}
@@ -344,6 +376,29 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
         contact={editTarget}
         onDone={() => router.refresh()}
       />
+
+      {logTarget ? (
+        <QuickLogCommunication
+          open={logTarget !== null}
+          onOpenChange={(o) => {
+            if (!o) setLogTarget(null)
+          }}
+          companyId={logTarget.companyId}
+          defaultContactId={logTarget.id}
+          contacts={[
+            {
+              id: logTarget.id,
+              name: `${logTarget.firstName} ${logTarget.lastName}`.trim(),
+              email: logTarget.email,
+              linkedinUrl: logTarget.linkedinUrl,
+            },
+          ]}
+          onLogged={() => {
+            setLogTarget(null)
+            router.refresh()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

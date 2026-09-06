@@ -48,6 +48,8 @@ export const PERMISSIONS = [
   "package:update",
   "package:archive",
 
+  "focus:manage",
+
   "data:import",
   "data:export",
 
@@ -93,6 +95,7 @@ const SPONSORSHIP_LEAD: Permission[] = [
   "package:create",
   "package:update",
   "package:archive",
+  "focus:manage",
   "invitation:create",
   "invitation:revoke",
   "data:import",

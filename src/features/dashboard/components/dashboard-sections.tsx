@@ -4,12 +4,13 @@ import { cn } from "@/lib/utils"
 import { Panel, PanelContent, PanelHeader } from "@/components/common/panel"
 import { EmptyState } from "@/components/common/empty-state"
 import {
+  BuildingIcon,
   CheckSquareIcon,
-  GitBranchIcon,
+  ClockAlertIcon,
+  TargetIcon,
 } from "lucide-react"
 import {
   describeDue,
-  formatMoney,
   formatMoneyCompact,
   formatTimeAgo,
   istanbulDayKey,
@@ -20,12 +21,11 @@ import {
   ACTIVITY_CHANNEL_LABELS,
   ACTIVITY_KIND_LABELS,
 } from "@/features/activities/schema"
-import { StagePill } from "@/features/opportunities/components/stage-pill"
 import type { ActivityListItem } from "@/features/activities/queries"
 import type {
   DashboardAgendaItem,
-  DashboardQuickRow,
   DashboardStageSummary,
+  WorkloadRow,
 } from "@/features/dashboard/queries"
 
 const DUE_TONE: Record<string, string> = {
@@ -38,29 +38,82 @@ const DUE_TONE: Record<string, string> = {
 
 /* ------------------------------------------------------------------ */
 
-export function TodayPanel({ items }: { items: DashboardAgendaItem[] }) {
+export function MyWorkStrip({
+  work,
+}: {
+  work: {
+    companies: number
+    openOpportunities: number
+    dueToday: number
+    overdue: number
+  }
+}) {
+  const cells = [
+    { label: "Firmam", value: work.companies, href: "/companies?filter=mine" },
+    {
+      label: "Açık Fırsatım",
+      value: work.openOpportunities,
+      href: "/opportunities?owner=me",
+    },
+    { label: "Bugün", value: work.dueToday, href: "/tasks" },
+    { label: "Geciken", value: work.overdue, href: "/tasks?quick=overdue" },
+  ]
+  return (
+    <div className="bg-border grid grid-cols-2 gap-px overflow-hidden rounded-xl border sm:grid-cols-4">
+      {cells.map((c) => (
+        <Link
+          key={c.label}
+          href={c.href}
+          className="bg-card hover:bg-muted/40 flex flex-col gap-0.5 px-3.5 py-3"
+        >
+          <span
+            className={cn(
+              "font-heading text-lg leading-tight font-semibold tabular-nums",
+              c.label === "Geciken" && c.value > 0 && "text-destructive"
+            )}
+          >
+            {c.value}
+          </span>
+          <span className="text-muted-foreground truncate text-xs">
+            {c.label}
+          </span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
+export function TodayPanel({
+  items,
+  overdueCount,
+}: {
+  items: DashboardAgendaItem[]
+  overdueCount: number
+}) {
   const today = istanbulDayKey(new Date())
   const list = items
-    .filter(
-      (i) =>
-        !i.done &&
-        (!i.dueAt || istanbulDayKey(i.dueAt) <= today)
-    )
-    .slice(0, 8)
+    .filter((i) => !i.done && (!i.dueAt || istanbulDayKey(i.dueAt) <= today))
+    .slice(0, 10)
 
   return (
     <Panel>
       <PanelHeader
         title="Bugün Yapılacaklar"
-        description="Bugüne kadar planlanmış görev ve aksiyonlar"
+        description={
+          overdueCount > 0
+            ? `${overdueCount} geciken · bugüne kadar planlanan işler`
+            : "Bugüne kadar planlanan görev ve aksiyonlar"
+        }
         action={{ label: "Tüm görevler", href: "/tasks" }}
       />
       {list.length === 0 ? (
         <div className="p-4">
           <EmptyState
             icon={CheckSquareIcon}
-            title="Bugün için bekleyen aksiyon yok"
-            description="Yeni bir görev ya da sonraki aksiyon eklediğinde burada görünecek."
+            title="Bugün için bekleyen işin yok"
+            description="Sana atanan bir görev ya da fırsat aksiyonu olduğunda burada görünecek."
           />
         </div>
       ) : (
@@ -110,19 +163,19 @@ export function TodayPanel({ items }: { items: DashboardAgendaItem[] }) {
 /* ------------------------------------------------------------------ */
 
 export function UpcomingStrip({ items }: { items: DashboardAgendaItem[] }) {
-  const dated = items.filter((i) => i.dueAt && !i.done).slice(0, 8)
+  const today = istanbulDayKey(new Date())
+  const dated = items
+    .filter(
+      (i) => i.dueAt && !i.done && istanbulDayKey(i.dueAt) > today
+    )
+    .slice(0, 8)
 
   return (
     <Panel>
-      <PanelHeader
-        title="Yaklaşanlar"
-        description="Önümüzdeki günlerin planı"
-      />
-      <PanelContent className="flex flex-col gap-2">
+      <PanelHeader title="Yaklaşanlar" description="Önümüzdeki günlerin planı" />
+      <PanelContent className="flex flex-col gap-1">
         {dated.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Tarihli bir aksiyon yok.
-          </p>
+          <p className="text-muted-foreground text-sm">Tarihli bir işin yok.</p>
         ) : (
           dated.map((item) => (
             <Link
@@ -130,7 +183,7 @@ export function UpcomingStrip({ items }: { items: DashboardAgendaItem[] }) {
               href={item.href}
               className="hover:bg-muted/40 flex items-center gap-3 rounded-lg px-2 py-1.5"
             >
-              <span className="text-muted-foreground w-16 shrink-0 text-xs font-medium tabular-nums uppercase">
+              <span className="text-muted-foreground w-16 shrink-0 text-xs font-medium tabular-nums">
                 {shortDay(item.dueAt!)}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm">
@@ -207,6 +260,79 @@ export function StageProgress({
 
 /* ------------------------------------------------------------------ */
 
+export function TeamWorkloadPanel({
+  rows,
+  unassigned,
+}: {
+  rows: WorkloadRow[]
+  unassigned: number
+}) {
+  return (
+    <Panel>
+      <PanelHeader
+        title="Ekip İş Yükü"
+        description="Firma ve iş dağılımı"
+        action={{ label: "Ekip", href: "/team" }}
+      />
+      <ul className="divide-border divide-y">
+        {rows.map((r) => (
+          <li
+            key={r.membershipId}
+            className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+          >
+            <span className="flex items-center gap-1.5 truncate font-medium">
+              {r.name}
+              {r.isCurrentUser ? (
+                <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[0.625rem]">
+                  Sen
+                </span>
+              ) : null}
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-3 text-xs tabular-nums">
+              <span className="inline-flex items-center gap-1">
+                <BuildingIcon className="size-3.5" />
+                {r.companies}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <TargetIcon className="size-3.5" />
+                {r.openOpportunities}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  r.overdue > 0 && "text-destructive"
+                )}
+              >
+                <ClockAlertIcon className="size-3.5" />
+                {r.overdue}/{r.openTasks}
+              </span>
+            </span>
+          </li>
+        ))}
+        {unassigned > 0 ? (
+          <li>
+            <Link
+              href="/companies?owner=unassigned"
+              className="hover:bg-muted/40 flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+            >
+              <span className="font-medium">Atanmamış</span>
+              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs tabular-nums">
+                <BuildingIcon className="size-3.5" />
+                {unassigned} firma
+              </span>
+            </Link>
+          </li>
+        ) : null}
+      </ul>
+      <PanelContent className="text-muted-foreground border-t pt-2 text-[0.6875rem]">
+        Sütunlar: firma · açık fırsat · geciken/açık görev
+      </PanelContent>
+    </Panel>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
 export function RecentActivityPanel({
   activities,
 }: {
@@ -250,80 +376,6 @@ export function RecentActivityPanel({
             </li>
           ))}
         </ul>
-      )}
-    </Panel>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-
-export function QuickPipelinePanel({
-  rows,
-}: {
-  rows: DashboardQuickRow[]
-}) {
-  return (
-    <Panel>
-      <PanelHeader
-        title="Hızlı Pipeline"
-        description="Öne çıkan açık fırsatlar"
-        action={{ label: "Tüm fırsatlar", href: "/opportunities" }}
-      />
-      {rows.length === 0 ? (
-        <PanelContent>
-          <EmptyState
-            icon={GitBranchIcon}
-            title="Açık fırsat yok"
-            description="Bir fırsat oluşturduğunda burada görünecek."
-          />
-        </PanelContent>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-160 border-collapse text-sm whitespace-nowrap">
-            <thead>
-              <tr className="text-muted-foreground border-b text-left text-xs">
-                <th className="px-4 py-2 font-medium">Firma / Fırsat</th>
-                <th className="px-4 py-2 font-medium">Aşama</th>
-                <th className="px-4 py-2 font-medium">Sorumlu</th>
-                <th className="w-full px-4 py-2 font-medium">Sonraki Aksiyon</th>
-                <th className="px-4 py-2 text-right font-medium">
-                  Tahmini Değer
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/40">
-                  <td className="px-4 py-2.5">
-                    <Link
-                      href={`/opportunities/${r.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {r.title}
-                    </Link>
-                    <span className="text-muted-foreground block text-xs">
-                      {r.companyName}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <StagePill name={r.stageName} type={r.stageType} />
-                  </td>
-                  <td className="text-muted-foreground px-4 py-2.5">
-                    {r.ownerName ?? "—"}
-                  </td>
-                  <td className="text-muted-foreground w-full px-4 py-2.5">
-                    {r.nextAction ?? "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium tabular-nums">
-                    {r.estimatedValue != null
-                      ? formatMoney(r.estimatedValue, r.currency)
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
     </Panel>
   )

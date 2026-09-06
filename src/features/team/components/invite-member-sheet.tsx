@@ -63,12 +63,14 @@ export function InviteMemberSheet({ open, onOpenChange, roles }: Props) {
     }
     setError(null)
     startTransition(async () => {
+      const trimmedEmail = email.trim()
       const result = await inviteMember({ fullName, email, role })
       if (result.ok) {
         toast.success(
           result.emailDelivered
-            ? "Davet e-postası gönderildi."
-            : (result.message ?? "Davet oluşturuldu.")
+            ? `${trimmedEmail} adresine davet gönderildi.`
+            : (result.message ??
+                "Davet kaydedildi ancak e-posta gönderilemedi.")
         )
         onOpenChange(false)
         router.refresh()

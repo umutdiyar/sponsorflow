@@ -120,6 +120,26 @@ export function addDaysToKey(key: string, n: number): string {
   )}-${String(next.getUTCDate()).padStart(2, "0")}`
 }
 
+/** Day-of-week for a "YYYY-MM-DD" key: 1 = Monday … 7 = Sunday. */
+export function weekdayOfKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number)
+  const js = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 0 = Sunday
+  return js === 0 ? 7 : js
+}
+
+/** Monday…Sunday keys of the Istanbul week containing `value` (default: now). */
+export function istanbulWeekBounds(value: DateInput = new Date()): {
+  startKey: string
+  endKey: string
+} {
+  const today = istanbulDayKey(value)
+  const dow = weekdayOfKey(today)
+  return {
+    startKey: addDaysToKey(today, -(dow - 1)),
+    endKey: addDaysToKey(today, 7 - dow),
+  }
+}
+
 /** "Bugün" / "Yarın" / "Dün" / "3 gün gecikti" / "2 Eyl 2026" */
 export function formatRelativeDay(value: DateInput): string {
   const diff = daysFromToday(value)

@@ -37,6 +37,7 @@ export default async function ContactsPage({
           create: hasPermission(membership.role, "contact:create"),
           update: hasPermission(membership.role, "contact:update"),
           archive: hasPermission(membership.role, "contact:archive"),
+          logActivity: hasPermission(membership.role, "activity:create"),
         }}
       />
     </div>

@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2Icon } from "lucide-react"
+import { ChevronDownIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
+
+import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -99,6 +101,7 @@ export function OpportunityFormSheet({
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [showDetails, setShowDetails] = useState(false)
   const isEdit = Boolean(opportunity)
 
   const fallbackStageId =
@@ -120,6 +123,24 @@ export function OpportunityFormSheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, opportunity, defaultCompanyId])
+
+  // Expand "Detaylar" on open when the opportunity already has detail values.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setShowDetails(
+        Boolean(
+          opportunity?.packageId ||
+            opportunity?.estimatedValue != null ||
+            opportunity?.probability != null ||
+            opportunity?.nextAction ||
+            opportunity?.nextActionAt ||
+            opportunity?.expectedCloseDate
+        )
+      )
+    }
+  }
 
   const onSubmit = handleSubmit((values) => {
     startTransition(async () => {
@@ -216,62 +237,83 @@ export function OpportunityFormSheet({
               </Field>
             </div>
 
-            <Field label="Sponsorluk Paketi">
-              <select className={selectClass} {...register("packageId")}>
-                <option value="">Paket yok</option>
-                {packages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field
-                label="Tahmini Değer"
-                error={errors.estimatedValue?.message}
-              >
-                <Input
-                  inputMode="numeric"
-                  placeholder="50000"
-                  {...register("estimatedValue")}
-                />
-              </Field>
-              <Field
-                label="Olasılık (%)"
-                error={errors.probability?.message}
-              >
-                <Input
-                  inputMode="numeric"
-                  placeholder="40"
-                  {...register("probability")}
-                />
-              </Field>
-            </div>
-
-            <Field label="Sonraki Aksiyon" error={errors.nextAction?.message}>
-              <Textarea
-                rows={2}
-                placeholder="Örn. Teklif dokümanını e-posta ile gönder"
-                {...register("nextAction")}
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-xs font-medium"
+            >
+              <ChevronDownIcon
+                className={cn(
+                  "size-3.5 transition-transform",
+                  showDetails && "rotate-180"
+                )}
               />
-            </Field>
+              Detaylar
+            </button>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field
-                label="Sonraki Aksiyon Tarihi"
-                error={errors.nextActionAt?.message}
-              >
-                <Input type="date" {...register("nextActionAt")} />
-              </Field>
-              <Field
-                label="Beklenen Kapanış"
-                error={errors.expectedCloseDate?.message}
-              >
-                <Input type="date" {...register("expectedCloseDate")} />
-              </Field>
-            </div>
+            {showDetails ? (
+              <div className="space-y-4">
+                <Field label="Sponsorluk Paketi">
+                  <select className={selectClass} {...register("packageId")}>
+                    <option value="">Paket yok</option>
+                    {packages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Tahmini Değer"
+                    error={errors.estimatedValue?.message}
+                  >
+                    <Input
+                      inputMode="numeric"
+                      placeholder="50000"
+                      {...register("estimatedValue")}
+                    />
+                  </Field>
+                  <Field
+                    label="Olasılık (%)"
+                    error={errors.probability?.message}
+                  >
+                    <Input
+                      inputMode="numeric"
+                      placeholder="40"
+                      {...register("probability")}
+                    />
+                  </Field>
+                </div>
+
+                <Field
+                  label="Sonraki Aksiyon"
+                  error={errors.nextAction?.message}
+                >
+                  <Textarea
+                    rows={2}
+                    placeholder="Örn. Teklif dokümanını e-posta ile gönder"
+                    {...register("nextAction")}
+                  />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Sonraki Aksiyon Tarihi"
+                    error={errors.nextActionAt?.message}
+                  >
+                    <Input type="date" {...register("nextActionAt")} />
+                  </Field>
+                  <Field
+                    label="Beklenen Kapanış"
+                    error={errors.expectedCloseDate?.message}
+                  >
+                    <Input type="date" {...register("expectedCloseDate")} />
+                  </Field>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <SheetFooter className="flex-row justify-end border-t">

@@ -17,8 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { toDateInputValue } from "@/lib/format"
+import { addDaysToKey, istanbulDayKey, toDateInputValue } from "@/lib/format"
 import { updateNextAction } from "@/features/opportunities/actions"
+
+const RESCHEDULE = [
+  { label: "Yarına ertele", days: 1 },
+  { label: "Gelecek haftaya ertele", days: 7 },
+] as const
 
 type Props = {
   open: boolean
@@ -52,14 +57,24 @@ export function NextActionDialog({
     }
   }
 
-  function save(clear = false) {
+  function save(
+    mode: "save" | "clear" | "done" = "save",
+    overrideDate?: string
+  ) {
+    const clear = mode !== "save"
     startTransition(async () => {
       const result = await updateNextAction(opportunityId, {
         nextAction: clear ? "" : text,
-        nextActionAt: clear ? "" : date,
+        nextActionAt: clear ? "" : (overrideDate ?? date),
       })
       if (result.ok) {
-        toast.success(clear ? "Sonraki aksiyon temizlendi." : "Kaydedildi.")
+        toast.success(
+          mode === "done"
+            ? "Aksiyon tamamlandı olarak işaretlendi."
+            : mode === "clear"
+              ? "Sonraki aksiyon temizlendi."
+              : "Kaydedildi."
+        )
         onOpenChange(false)
         router.refresh()
         onSaved()
@@ -68,6 +83,8 @@ export function NextActionDialog({
       }
     })
   }
+
+  const today = istanbulDayKey(new Date())
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,6 +115,30 @@ export function NextActionDialog({
               onChange={(e) => setDate(e.target.value)}
             />
           </label>
+
+          {nextAction ? (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {RESCHEDULE.map((r) => (
+                <button
+                  key={r.days}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => save("save", addDaysToKey(today, r.days))}
+                  className="border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-full border px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  {r.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => save("done")}
+                className="border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-full border px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+              >
+                Tamamlandı
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter className="sm:justify-between">
@@ -106,7 +147,7 @@ export function NextActionDialog({
               type="button"
               variant="ghost"
               className="text-muted-foreground"
-              onClick={() => save(true)}
+              onClick={() => save("clear")}
               disabled={isPending}
             >
               Temizle
@@ -123,7 +164,7 @@ export function NextActionDialog({
             </DialogClose>
             <Button
               type="button"
-              onClick={() => save(false)}
+              onClick={() => save("save")}
               disabled={isPending}
             >
               {isPending ? <Loader2Icon className="animate-spin" /> : null}

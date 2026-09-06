@@ -1,16 +1,7 @@
-import {
-  CalendarClockIcon,
-  GripVerticalIcon,
-  PackageIcon,
-  UserIcon,
-} from "lucide-react"
+import { CalendarClockIcon, GripVerticalIcon, UserIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import {
-  describeDue,
-  formatMoneyCompact,
-  formatTimeAgo,
-} from "@/lib/format"
+import { describeDue, formatMoneyCompact } from "@/lib/format"
 import type { OpportunityRow } from "@/features/opportunities/queries"
 
 const DUE_TONE: Record<string, string> = {
@@ -86,12 +77,6 @@ export function PipelineCard({
             {formatMoneyCompact(o.estimatedValue, o.currency)}
           </span>
         ) : null}
-        {o.packageName ? (
-          <span className="inline-flex items-center gap-1">
-            <PackageIcon className="size-3" />
-            {o.packageName}
-          </span>
-        ) : null}
       </div>
 
       {o.nextAction ? (
@@ -110,12 +95,6 @@ export function PipelineCard({
           </span>
         </p>
       ) : null}
-
-      <p className="text-muted-foreground text-[0.6875rem]">
-        {o.lastActivityAt
-          ? `Son hareket ${formatTimeAgo(o.lastActivityAt)}`
-          : "Henüz aktivite yok"}
-      </p>
     </div>
   )
 }

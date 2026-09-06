@@ -14,12 +14,19 @@ function Panel({ className, ...props }: React.ComponentProps<"section">) {
   )
 }
 
+type PanelAction =
+  | { label: string; href: string; onClick?: never }
+  | { label: string; onClick: () => void; href?: never }
+
 type PanelHeaderProps = {
   title: string
   description?: string
-  action?: { label: string; href: string }
+  action?: PanelAction
   className?: string
 }
+
+const actionClass =
+  "text-muted-foreground hover:text-foreground shrink-0 rounded-sm text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 function PanelHeader({
   title,
@@ -40,13 +47,14 @@ function PanelHeader({
           <p className="text-muted-foreground text-xs">{description}</p>
         ) : null}
       </div>
-      {action ? (
-        <Link
-          href={action.href}
-          className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+      {action?.href ? (
+        <Link href={action.href} className={actionClass}>
           {action.label}
         </Link>
+      ) : action?.onClick ? (
+        <button type="button" onClick={action.onClick} className={actionClass}>
+          {action.label}
+        </button>
       ) : null}
     </div>
   )

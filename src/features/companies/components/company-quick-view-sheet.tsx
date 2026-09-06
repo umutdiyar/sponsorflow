@@ -7,6 +7,7 @@ import {
   ArrowUpRightIcon,
   ExternalLinkIcon,
   MailIcon,
+  MessageSquarePlusIcon,
   PencilIcon,
   PlusIcon,
   Share2Icon,
@@ -162,8 +163,8 @@ export function CompanyQuickViewSheet({
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {canLogActivity ? (
                     <Button size="sm" onClick={() => setLogOpen(true)}>
-                      <PlusIcon />
-                      İletişim Ekle
+                      <MessageSquarePlusIcon />
+                      İletişim Kaydet
                     </Button>
                   ) : null}
                   <Button
