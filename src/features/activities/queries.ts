@@ -1,12 +1,18 @@
 import "server-only"
 
 import { prisma } from "@/lib/db/prisma"
-import type { ActivityType } from "@/generated/prisma/enums"
+import type {
+  ActivityChannel,
+  ActivityDirection,
+  ActivityKind,
+} from "@/generated/prisma/enums"
 import type { Prisma } from "@/generated/prisma/client"
 
 export type ActivityListItem = {
   id: string
-  type: ActivityType
+  channel: ActivityChannel
+  kind: ActivityKind
+  direction: ActivityDirection
   title: string | null
   description: string | null
   occurredAt: Date
@@ -25,7 +31,9 @@ function memberName(profile: { fullName: string | null; email: string }) {
 
 const listSelect = {
   id: true,
-  type: true,
+  channel: true,
+  kind: true,
+  direction: true,
   title: true,
   description: true,
   occurredAt: true,
@@ -40,23 +48,14 @@ const listSelect = {
   },
 } satisfies Prisma.ActivitySelect
 
-function toItem(row: {
-  id: string
-  type: ActivityType
-  title: string | null
-  description: string | null
-  occurredAt: Date
-  createdAt: Date
-  companyId: string
-  opportunityId: string | null
-  company: { name: string }
-  opportunity: { title: string } | null
-  contact: { firstName: string; lastName: string } | null
-  createdBy: { profile: { fullName: string | null; email: string } }
-}): ActivityListItem {
+type RawRow = Prisma.ActivityGetPayload<{ select: typeof listSelect }>
+
+function toItem(row: RawRow): ActivityListItem {
   return {
     id: row.id,
-    type: row.type,
+    channel: row.channel,
+    kind: row.kind,
+    direction: row.direction,
     title: row.title,
     description: row.description,
     occurredAt: row.occurredAt,
@@ -72,7 +71,6 @@ function toItem(row: {
   }
 }
 
-/** Timeline for one opportunity (most recent first, capped). */
 export async function listOpportunityActivities(
   organizationId: string,
   opportunityId: string,
@@ -87,7 +85,6 @@ export async function listOpportunityActivities(
   return rows.map(toItem)
 }
 
-/** Timeline for a company (all activities on it, capped). */
 export async function listCompanyActivities(
   organizationId: string,
   companyId: string,
@@ -104,7 +101,9 @@ export async function listCompanyActivities(
 
 export type ActivityFeedFilters = {
   organizationId: string
-  type?: string
+  channel?: string
+  kind?: string
+  direction?: string
   memberId?: string
   companyId?: string
   from?: string
@@ -118,19 +117,30 @@ export type ActivityFeedResult = {
   nextCursor: string | null
 }
 
-const ACTIVITY_TYPE_SET = new Set<ActivityType>([
+const CHANNEL_SET = new Set<ActivityChannel>([
   "EMAIL",
-  "PHONE",
-  "MEETING",
   "LINKEDIN",
   "WHATSAPP",
-  "NOTE",
-  "PROPOSAL",
+  "PHONE",
+  "MEETING",
+  "OTHER",
+  "INTERNAL",
+])
+const KIND_SET = new Set<ActivityKind>([
+  "INITIAL_CONTACT",
   "FOLLOW_UP",
+  "RESPONSE",
+  "PROPOSAL",
+  "MEETING_NOTE",
+  "NOTE",
   "STAGE_CHANGE",
 ])
+const DIRECTION_SET = new Set<ActivityDirection>([
+  "OUTBOUND",
+  "INBOUND",
+  "INTERNAL",
+])
 
-/** Global activity feed with filters + keyset pagination on `occurredAt`. */
 export async function getActivitiesFeed(
   filters: ActivityFeedFilters
 ): Promise<ActivityFeedResult> {
@@ -139,8 +149,17 @@ export async function getActivitiesFeed(
   const where: Prisma.ActivityWhereInput = {
     organizationId: filters.organizationId,
   }
-  if (filters.type && ACTIVITY_TYPE_SET.has(filters.type as ActivityType)) {
-    where.type = filters.type as ActivityType
+  if (filters.channel && CHANNEL_SET.has(filters.channel as ActivityChannel)) {
+    where.channel = filters.channel as ActivityChannel
+  }
+  if (filters.kind && KIND_SET.has(filters.kind as ActivityKind)) {
+    where.kind = filters.kind as ActivityKind
+  }
+  if (
+    filters.direction &&
+    DIRECTION_SET.has(filters.direction as ActivityDirection)
+  ) {
+    where.direction = filters.direction as ActivityDirection
   }
   if (filters.memberId) where.createdByMembershipId = filters.memberId
   if (filters.companyId) where.companyId = filters.companyId
@@ -155,9 +174,7 @@ export async function getActivitiesFeed(
     select: listSelect,
     orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     take: take + 1,
-    ...(filters.cursor
-      ? { cursor: { id: filters.cursor }, skip: 1 }
-      : {}),
+    ...(filters.cursor ? { cursor: { id: filters.cursor }, skip: 1 } : {}),
   })
 
   const hasMore = rows.length > take
@@ -169,7 +186,6 @@ export async function getActivitiesFeed(
   }
 }
 
-/** A few recent activities for the dashboard. */
 export async function listRecentActivities(
   organizationId: string,
   take = 6
@@ -181,4 +197,65 @@ export async function listRecentActivities(
     take,
   })
   return rows.map(toItem)
+}
+
+export type LastContact = { at: Date; channel: ActivityChannel }
+
+/**
+ * Latest *external* (non-INTERNAL) contact per company, derived from the
+ * activity log — no denormalized column. One indexed query, reduced in memory.
+ */
+export async function lastContactByCompany(
+  organizationId: string,
+  companyIds: string[]
+): Promise<Map<string, LastContact>> {
+  const ids = [...new Set(companyIds)].filter(Boolean)
+  if (ids.length === 0) return new Map()
+
+  const rows = await prisma.activity.findMany({
+    where: {
+      organizationId,
+      companyId: { in: ids },
+      channel: { not: "INTERNAL" },
+    },
+    select: { companyId: true, occurredAt: true, channel: true },
+    orderBy: { occurredAt: "desc" },
+    take: 4000,
+  })
+
+  const map = new Map<string, LastContact>()
+  for (const r of rows) {
+    if (!map.has(r.companyId)) {
+      map.set(r.companyId, { at: r.occurredAt, channel: r.channel })
+    }
+  }
+  return map
+}
+
+/** Same as above but keyed by contact id. */
+export async function lastContactByContact(
+  organizationId: string,
+  contactIds: string[]
+): Promise<Map<string, LastContact>> {
+  const ids = [...new Set(contactIds)].filter(Boolean)
+  if (ids.length === 0) return new Map()
+
+  const rows = await prisma.activity.findMany({
+    where: {
+      organizationId,
+      contactId: { in: ids },
+      channel: { not: "INTERNAL" },
+    },
+    select: { contactId: true, occurredAt: true, channel: true },
+    orderBy: { occurredAt: "desc" },
+    take: 4000,
+  })
+
+  const map = new Map<string, LastContact>()
+  for (const r of rows) {
+    if (r.contactId && !map.has(r.contactId)) {
+      map.set(r.contactId, { at: r.occurredAt, channel: r.channel })
+    }
+  }
+  return map
 }

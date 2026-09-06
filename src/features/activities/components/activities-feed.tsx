@@ -8,15 +8,21 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ActivityTimeline } from "@/features/activities/components/activity-timeline"
 import {
-  ACTIVITY_TYPE_LABELS,
-  ACTIVITY_TYPES,
+  ACTIVITY_CHANNELS,
+  ACTIVITY_CHANNEL_LABELS,
+  ACTIVITY_DIRECTIONS,
+  ACTIVITY_DIRECTION_LABELS,
+  ACTIVITY_KINDS,
+  ACTIVITY_KIND_LABELS,
 } from "@/features/activities/schema"
 import { fetchActivityPage } from "@/features/activities/actions"
 import type { ActivityListItem } from "@/features/activities/queries"
 import type { MemberRef, CompanyRef } from "@/lib/org/reference"
 
 type Filters = {
-  type: string
+  channel: string
+  kind: string
+  direction: string
   member: string
   company: string
   from: string
@@ -69,7 +75,9 @@ export function ActivitiesFeed({
   )
 
   const hasFilters = Boolean(
-    filters.type ||
+    filters.channel ||
+      filters.kind ||
+      filters.direction ||
       filters.member ||
       filters.company ||
       filters.from ||
@@ -80,7 +88,9 @@ export function ActivitiesFeed({
     if (!cursor) return
     startLoading(async () => {
       const result = await fetchActivityPage({
-        type: filters.type || undefined,
+        channel: filters.channel || undefined,
+        kind: filters.kind || undefined,
+        direction: filters.direction || undefined,
         memberId: filters.member || undefined,
         companyId: filters.company || undefined,
         from: filters.from || undefined,
@@ -100,15 +110,43 @@ export function ActivitiesFeed({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <select
-          value={filters.type}
-          onChange={(e) => setParam("type", e.target.value)}
+          value={filters.channel}
+          onChange={(e) => setParam("channel", e.target.value)}
+          aria-label="Kanala göre filtrele"
+          className={selectClass}
+        >
+          <option value="">Tüm kanallar</option>
+          {ACTIVITY_CHANNELS.map((c) => (
+            <option key={c} value={c}>
+              {ACTIVITY_CHANNEL_LABELS[c]}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filters.kind}
+          onChange={(e) => setParam("kind", e.target.value)}
           aria-label="Türe göre filtrele"
           className={selectClass}
         >
           <option value="">Tüm türler</option>
-          {ACTIVITY_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {ACTIVITY_TYPE_LABELS[t]}
+          {ACTIVITY_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {ACTIVITY_KIND_LABELS[k]}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filters.direction}
+          onChange={(e) => setParam("direction", e.target.value)}
+          aria-label="Yöne göre filtrele"
+          className={selectClass}
+        >
+          <option value="">Tüm yönler</option>
+          {ACTIVITY_DIRECTIONS.map((d) => (
+            <option key={d} value={d}>
+              {ACTIVITY_DIRECTION_LABELS[d]}
             </option>
           ))}
         </select>

@@ -2,10 +2,7 @@ import type { Metadata } from "next"
 
 import { requirePermission } from "@/lib/auth/membership"
 import { PageHeader } from "@/components/common/page-header"
-import {
-  listCompanyOptions,
-  listMembers,
-} from "@/lib/org/reference"
+import { listCompanyOptions, listMembers } from "@/lib/org/reference"
 import { getActivitiesFeed } from "@/features/activities/queries"
 import { ActivitiesFeed } from "@/features/activities/components/activities-feed"
 
@@ -15,7 +12,9 @@ export default async function ActivitiesPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    type?: string
+    channel?: string
+    kind?: string
+    direction?: string
     member?: string
     company?: string
     from?: string
@@ -28,7 +27,9 @@ export default async function ActivitiesPage({
   const [feed, members, companies] = await Promise.all([
     getActivitiesFeed({
       organizationId: membership.organizationId,
-      type: sp.type,
+      channel: sp.channel,
+      kind: sp.kind,
+      direction: sp.direction,
       memberId: sp.member,
       companyId: sp.company,
       from: sp.from,
@@ -42,14 +43,16 @@ export default async function ActivitiesPage({
     <div className="mx-auto flex max-w-4xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Aktiviteler"
-        description="Tüm firmalardaki e-posta, görüşme, teklif ve not kayıtlarının ortak akışı."
+        description="Tüm firmalardaki iletişim ve not kayıtlarının ortak akışı."
       />
 
       <ActivitiesFeed
         initialItems={feed.items}
         initialCursor={feed.nextCursor}
         filters={{
-          type: sp.type ?? "",
+          channel: sp.channel ?? "",
+          kind: sp.kind ?? "",
+          direction: sp.direction ?? "",
           member: sp.member ?? "",
           company: sp.company ?? "",
           from: sp.from ?? "",

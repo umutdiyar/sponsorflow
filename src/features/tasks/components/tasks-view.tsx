@@ -74,7 +74,7 @@ const selectClass =
   "border-input bg-background h-8 rounded-lg border px-2.5 text-sm outline-none"
 
 export function TasksView({
-  tasks,
+  tasks: serverTasks,
   members,
   companies,
   opportunities,
@@ -88,6 +88,17 @@ export function TasksView({
   const searchParams = useSearchParams()
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [, startTransition] = useTransition()
+
+  // Local copy so the done-toggle and archive are optimistic.
+  const [tasks, setTasks] = useState(serverTasks)
+  const sig = serverTasks
+    .map((t) => `${t.id}:${t.status}:${t.updatedAt.getTime()}`)
+    .join("|")
+  const [prevSig, setPrevSig] = useState(sig)
+  if (sig !== prevSig) {
+    setPrevSig(sig)
+    setTasks(serverTasks)
+  }
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<TaskFormTarget | null>(null)
@@ -115,22 +126,38 @@ export function TasksView({
 
   function toggleDone(task: TaskRow) {
     const done = task.status !== "DONE"
+    const prev = tasks
+    setTasks((list) =>
+      list.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              status: done ? "DONE" : "TODO",
+              completedAt: done ? new Date() : null,
+            }
+          : t
+      )
+    )
     startTransition(async () => {
       const result = await updateTaskStatus(task.id, {
         status: done ? "DONE" : "TODO",
       })
-      if (result.ok) router.refresh()
-      else toast.error(result.error)
+      if (!result.ok) {
+        setTasks(prev)
+        toast.error(result.error)
+      }
     })
   }
 
   function onArchive(task: TaskRow) {
+    const prev = tasks
+    setTasks((list) => list.filter((t) => t.id !== task.id))
     startTransition(async () => {
       const result = await archiveTask(task.id)
       if (result.ok) {
         toast.success("Görev arşivlendi.")
-        router.refresh()
       } else {
+        setTasks(prev)
         toast.error(result.error)
       }
     })

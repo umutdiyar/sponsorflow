@@ -2,7 +2,9 @@ import "server-only"
 
 import { prisma } from "@/lib/db/prisma"
 import type { Prisma } from "@/generated/prisma/client"
+import type { ActivityChannel } from "@/generated/prisma/enums"
 import { listCompanyOptions, type CompanyRef } from "@/lib/org/reference"
+import { lastContactByContact } from "@/features/activities/queries"
 
 export type ContactRow = {
   id: string
@@ -18,6 +20,9 @@ export type ContactRow = {
   updatedAt: Date
   companyId: string
   companyName: string
+  companyOwnerName: string | null
+  lastContactAt: Date | null
+  lastContactChannel: ActivityChannel | null
 }
 
 const rowSelect = {
@@ -33,7 +38,14 @@ const rowSelect = {
   isPrimary: true,
   updatedAt: true,
   companyId: true,
-  company: { select: { name: true } },
+  company: {
+    select: {
+      name: true,
+      owner: {
+        select: { profile: { select: { fullName: true, email: true } } },
+      },
+    },
+  },
 } satisfies Prisma.ContactSelect
 
 export type ContactsPageParams = {
@@ -78,22 +90,36 @@ export async function getContactsPageData(
     listCompanyOptions(params.organizationId),
   ])
 
+  const lastContact = await lastContactByContact(
+    params.organizationId,
+    rows.map((r) => r.id)
+  )
+
   return {
-    contacts: rows.map((r) => ({
-      id: r.id,
-      firstName: r.firstName,
-      lastName: r.lastName,
-      jobTitle: r.jobTitle,
-      department: r.department,
-      email: r.email,
-      phone: r.phone,
-      linkedinUrl: r.linkedinUrl,
-      notes: r.notes,
-      isPrimary: r.isPrimary,
-      updatedAt: r.updatedAt,
-      companyId: r.companyId,
-      companyName: r.company.name,
-    })),
+    contacts: rows.map((r) => {
+      const lc = lastContact.get(r.id) ?? null
+      return {
+        id: r.id,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        jobTitle: r.jobTitle,
+        department: r.department,
+        email: r.email,
+        phone: r.phone,
+        linkedinUrl: r.linkedinUrl,
+        notes: r.notes,
+        isPrimary: r.isPrimary,
+        updatedAt: r.updatedAt,
+        companyId: r.companyId,
+        companyName: r.company.name,
+        companyOwnerName: r.company.owner
+          ? r.company.owner.profile.fullName?.trim() ||
+            r.company.owner.profile.email
+          : null,
+        lastContactAt: lc?.at ?? null,
+        lastContactChannel: lc?.channel ?? null,
+      }
+    }),
     companies,
   }
 }

@@ -11,7 +11,11 @@ import {
 } from "@/lib/format"
 import { EmptyState } from "@/components/common/empty-state"
 import { ActivityIcon } from "@/features/activities/components/activity-icon"
-import { ACTIVITY_TYPE_LABELS } from "@/features/activities/schema"
+import {
+  ACTIVITY_CHANNEL_LABELS,
+  ACTIVITY_DIRECTION_LABELS,
+  ACTIVITY_KIND_LABELS,
+} from "@/features/activities/schema"
 import { ActivityIcon as ActivityLucide } from "lucide-react"
 import type { ActivityListItem } from "@/features/activities/queries"
 
@@ -64,7 +68,7 @@ export function ActivityTimeline({
                 className="animate-in fade-in-0 slide-in-from-left-1 relative flex gap-3 pb-4 duration-300 last:pb-0 motion-reduce:animate-none"
               >
                 <div className="flex flex-col items-center">
-                  <ActivityIcon type={a.type} />
+                  <ActivityIcon channel={a.channel} direction={a.direction} />
                   {i < items.length - 1 ? (
                     <span className="bg-border mt-1 w-px flex-1" />
                   ) : null}
@@ -72,8 +76,16 @@ export function ActivityTimeline({
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
                   <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
                     <span className="font-medium">
-                      {a.title?.trim() || ACTIVITY_TYPE_LABELS[a.type]}
+                      {a.title?.trim() ||
+                        (a.kind === "STAGE_CHANGE"
+                          ? ACTIVITY_KIND_LABELS[a.kind]
+                          : `${ACTIVITY_CHANNEL_LABELS[a.channel]} · ${ACTIVITY_KIND_LABELS[a.kind]}`)}
                     </span>
+                    {a.direction !== "INTERNAL" ? (
+                      <span className="text-muted-foreground text-[0.6875rem]">
+                        {ACTIVITY_DIRECTION_LABELS[a.direction]}
+                      </span>
+                    ) : null}
                     <span className="text-muted-foreground text-xs tabular-nums">
                       {formatTime(a.occurredAt)}
                     </span>

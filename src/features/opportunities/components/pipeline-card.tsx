@@ -1,4 +1,3 @@
-import Link from "next/link"
 import {
   CalendarClockIcon,
   GripVerticalIcon,
@@ -29,6 +28,7 @@ type Props = {
   handleProps?: Record<string, unknown>
   handleRef?: (el: HTMLButtonElement | null) => void
   canMove?: boolean
+  onOpen?: (id: string) => void
 }
 
 export function PipelineCard({
@@ -38,13 +38,17 @@ export function PipelineCard({
   handleProps,
   handleRef,
   canMove,
+  onOpen,
 }: Props) {
   const due = describeDue(o.nextActionAt)
 
   return (
     <div
+      onClick={onOpen ? () => onOpen(o.id) : undefined}
       className={cn(
-        "bg-card ring-foreground/10 flex flex-col gap-2 rounded-lg p-2.5 text-sm ring-1 transition-shadow",
+        "bg-card ring-foreground/10 flex flex-col gap-2 rounded-lg p-2.5 text-sm ring-1 transition-all",
+        onOpen &&
+          "hover:ring-foreground/20 cursor-pointer hover:-translate-y-px hover:shadow-sm",
         overlay && "shadow-lg",
         dragging && "opacity-40"
       )}
@@ -54,19 +58,15 @@ export function PipelineCard({
           <p className="text-muted-foreground truncate text-xs">
             {o.companyName}
           </p>
-          <Link
-            href={`/opportunities/${o.id}`}
-            className="line-clamp-2 font-medium hover:underline"
-          >
-            {o.title}
-          </Link>
+          <p className="line-clamp-2 font-medium">{o.title}</p>
         </div>
         {canMove ? (
           <button
             type="button"
             aria-label="Kartı taşı"
             ref={handleRef}
-            className="text-muted-foreground hover:text-foreground -mr-1 cursor-grab touch-none rounded p-0.5 active:cursor-grabbing"
+            onClick={(e) => e.stopPropagation()}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-1 shrink-0 cursor-grab touch-none rounded p-0.5 active:cursor-grabbing"
             {...handleProps}
           >
             <GripVerticalIcon className="size-4" />

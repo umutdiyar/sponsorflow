@@ -1,60 +1,74 @@
 import {
+  ArrowDownLeftIcon,
   ArrowRightLeftIcon,
+  ArrowUpRightIcon,
   CalendarIcon,
-  FileTextIcon,
   MailIcon,
   MessageCircleIcon,
   PhoneIcon,
-  RotateCwIcon,
   Share2Icon,
   StickyNoteIcon,
   type LucideIcon,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import type { ActivityType } from "@/generated/prisma/enums"
+import type {
+  ActivityChannel,
+  ActivityDirection,
+} from "@/generated/prisma/enums"
 
-const ICON: Record<ActivityType, LucideIcon> = {
+const ICON: Record<ActivityChannel, LucideIcon> = {
   EMAIL: MailIcon,
-  PHONE: PhoneIcon,
-  MEETING: CalendarIcon,
   LINKEDIN: Share2Icon,
   WHATSAPP: MessageCircleIcon,
-  NOTE: StickyNoteIcon,
-  PROPOSAL: FileTextIcon,
-  FOLLOW_UP: RotateCwIcon,
-  STAGE_CHANGE: ArrowRightLeftIcon,
+  PHONE: PhoneIcon,
+  MEETING: CalendarIcon,
+  OTHER: StickyNoteIcon,
+  INTERNAL: StickyNoteIcon,
 }
 
-const TONE: Record<ActivityType, string> = {
+const TONE: Record<ActivityChannel, string> = {
   EMAIL: "bg-info/10 text-info",
-  PHONE: "bg-info/10 text-info",
-  MEETING: "bg-brand-muted text-brand-foreground",
   LINKEDIN: "bg-info/10 text-info",
   WHATSAPP: "bg-success/10 text-success",
-  NOTE: "bg-muted text-muted-foreground",
-  PROPOSAL: "bg-warning/15 text-warning-foreground",
-  FOLLOW_UP: "bg-muted text-muted-foreground",
-  STAGE_CHANGE: "bg-muted text-muted-foreground",
+  PHONE: "bg-info/10 text-info",
+  MEETING: "bg-brand-muted text-brand-foreground",
+  OTHER: "bg-muted text-muted-foreground",
+  INTERNAL: "bg-muted text-muted-foreground",
+}
+
+const DIRECTION_ICON: Record<ActivityDirection, LucideIcon> = {
+  OUTBOUND: ArrowUpRightIcon,
+  INBOUND: ArrowDownLeftIcon,
+  INTERNAL: ArrowRightLeftIcon,
 }
 
 export function ActivityIcon({
-  type,
+  channel,
+  direction,
   className,
 }: {
-  type: ActivityType
+  channel: ActivityChannel
+  direction?: ActivityDirection
   className?: string
 }) {
-  const Icon = ICON[type]
+  const Icon = ICON[channel]
+  const DirIcon = direction ? DIRECTION_ICON[direction] : null
   return (
-    <span
-      className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full",
-        TONE[type],
-        className
-      )}
-    >
-      <Icon className="size-3.5" />
+    <span className={cn("relative shrink-0", className)}>
+      <span
+        className={cn(
+          "flex size-7 items-center justify-center rounded-full",
+          TONE[channel]
+        )}
+      >
+        <Icon className="size-3.5" />
+      </span>
+      {DirIcon && direction !== "INTERNAL" ? (
+        <span className="bg-background text-muted-foreground absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-full">
+          <DirIcon className="size-2.5" />
+        </span>
+      ) : null}
     </span>
   )
 }

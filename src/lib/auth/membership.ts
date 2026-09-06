@@ -33,10 +33,17 @@ export type CurrentMembership = {
 }
 
 /**
- * First-time provisioning: create the Profile row and join the user to the
- * single active organization (first member → OWNER, later → MEMBER). Runs at
- * most once per user, ever — steady-state requests take the read-only path in
- * `getCurrentMembership()`.
+ * First-time provisioning. Access is **invite-gated**:
+ *
+ *  - The very first authenticated user bootstraps the org as OWNER.
+ *  - Everyone else must have a PENDING or ACCEPTED `OrganizationInvitation` for
+ *    their email; they join with exactly the role on that invitation, and a
+ *    PENDING invite is marked ACCEPTED here. This also covers users who set
+ *    their password via the Supabase link and land straight on `/dashboard`
+ *    without visiting the accept-invite screen.
+ *  - Anyone else gets a `ForbiddenError` — no silent MEMBER provisioning.
+ *
+ * Runs at most once per user; steady state takes the read path.
  */
 async function provisionMembership(user: SessionUser) {
   const org = await prisma.organization.findFirst({
@@ -50,28 +57,56 @@ async function provisionMembership(user: SessionUser) {
     )
   }
 
-  await prisma.profile.upsert({
-    where: { id: user.id },
-    create: {
-      id: user.id,
-      email: user.email,
-      fullName: user.name,
-      avatarUrl: user.avatarUrl,
-    },
-    update: {},
-  })
+  const email = user.email.trim().toLowerCase()
 
   const memberCount = await prisma.organizationMembership.count({
     where: { organizationId: org.id },
   })
 
-  return prisma.organizationMembership.create({
-    data: {
-      organizationId: org.id,
-      profileId: user.id,
-      role: memberCount === 0 ? "OWNER" : "MEMBER",
-    },
-    include: { organization: true },
+  const invitation =
+    memberCount === 0
+      ? null
+      : await prisma.organizationInvitation.findFirst({
+          where: {
+            organizationId: org.id,
+            email,
+            status: { in: ["PENDING", "ACCEPTED"] },
+          },
+        })
+
+  if (memberCount > 0 && !invitation) {
+    throw new ForbiddenError(
+      "Bu panele erişmek için bir yönetici tarafından davet edilmen gerekiyor."
+    )
+  }
+
+  const role = memberCount === 0 ? "OWNER" : invitation!.role
+
+  return prisma.$transaction(async (tx) => {
+    await tx.profile.upsert({
+      where: { id: user.id },
+      create: {
+        id: user.id,
+        email: user.email,
+        fullName: user.name,
+        avatarUrl: user.avatarUrl,
+      },
+      update: {},
+    })
+
+    const membership = await tx.organizationMembership.create({
+      data: { organizationId: org.id, profileId: user.id, role },
+      include: { organization: true },
+    })
+
+    if (invitation && invitation.status === "PENDING") {
+      await tx.organizationInvitation.update({
+        where: { id: invitation.id },
+        data: { status: "ACCEPTED", acceptedAt: new Date() },
+      })
+    }
+
+    return membership
   })
 }
 
@@ -85,12 +120,19 @@ export const getCurrentMembership = cache(
   async (): Promise<CurrentMembership> => {
     const user = await requireUser()
 
-    const membership =
-      (await prisma.organizationMembership.findFirst({
-        where: { profileId: user.id },
-        include: { organization: true },
-        orderBy: { createdAt: "asc" },
-      })) ?? (await provisionMembership(user))
+    const existing = await prisma.organizationMembership.findFirst({
+      where: { profileId: user.id },
+      include: { organization: true },
+      orderBy: { createdAt: "asc" },
+    })
+
+    if (existing?.deactivatedAt) {
+      throw new ForbiddenError(
+        "Bu organizasyondaki erişimin kaldırıldı. Yeniden davet edilmen gerekiyor."
+      )
+    }
+
+    const membership = existing ?? (await provisionMembership(user))
 
     return {
       membershipId: membership.id,

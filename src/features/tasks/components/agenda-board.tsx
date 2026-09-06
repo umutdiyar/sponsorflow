@@ -290,7 +290,8 @@ function AgendaCard({
   return (
     <div
       className={cn(
-        "bg-card ring-foreground/10 flex flex-col gap-1.5 rounded-lg p-2.5 text-sm ring-1 transition-shadow",
+        "group/task bg-card ring-foreground/10 flex flex-col gap-1.5 rounded-lg p-2.5 text-sm ring-1 transition-all",
+        canMove && "hover:ring-foreground/20 hover:shadow-sm",
         overlay && "shadow-lg",
         dragging && "opacity-40"
       )}
@@ -309,7 +310,7 @@ function AgendaCard({
             type="button"
             aria-label="Görevi taşı"
             ref={handleRef}
-            className="text-muted-foreground hover:text-foreground -mr-1 cursor-grab touch-none rounded p-0.5 active:cursor-grabbing"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-1 shrink-0 cursor-grab touch-none rounded p-0.5 opacity-60 transition-opacity group-hover/task:opacity-100 active:cursor-grabbing"
             {...handleProps}
           >
             <GripVerticalIcon className="size-4" />

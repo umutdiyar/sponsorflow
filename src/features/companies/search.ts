@@ -1,12 +1,24 @@
 "use server"
 
 import { prisma } from "@/lib/db/prisma"
-import { getCurrentMembership } from "@/lib/auth/membership"
+import { getCurrentMembership, requirePermission } from "@/lib/auth/membership"
+import {
+  getCompanyQuickView,
+  type CompanyQuickView,
+} from "@/features/companies/queries"
 
 export type CompanySearchHit = {
   id: string
   name: string
   industry: string | null
+}
+
+/** On-demand data for the company quick-view Sheet. */
+export async function fetchCompanyQuickView(
+  companyId: string
+): Promise<CompanyQuickView | null> {
+  const membership = await requirePermission("company:read")
+  return getCompanyQuickView(membership.organizationId, companyId)
 }
 
 /**

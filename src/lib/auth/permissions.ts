@@ -10,13 +10,17 @@ export const PERMISSIONS = [
   "organization:update",
 
   "member:read",
-  "member:invite",
   "member:update",
+  "member:remove",
+
+  "invitation:create",
+  "invitation:revoke",
 
   "company:read",
   "company:create",
   "company:update",
   "company:archive",
+  "company:assign",
 
   "contact:read",
   "contact:create",
@@ -81,6 +85,7 @@ const MEMBER: Permission[] = [
 const SPONSORSHIP_LEAD: Permission[] = [
   ...MEMBER,
   "company:archive",
+  "company:assign",
   "contact:archive",
   "pipeline:update",
   "opportunity:archive",
@@ -88,7 +93,8 @@ const SPONSORSHIP_LEAD: Permission[] = [
   "package:create",
   "package:update",
   "package:archive",
-  "member:invite",
+  "invitation:create",
+  "invitation:revoke",
   "data:import",
 ]
 
@@ -96,6 +102,7 @@ const ADMIN: Permission[] = [
   ...SPONSORSHIP_LEAD,
   "organization:update",
   "member:update",
+  "member:remove",
   "settings:manage",
 ]
 
@@ -127,4 +134,48 @@ export const ORGANIZATION_ROLE_LABELS: Record<OrganizationRole, string> = {
   SPONSORSHIP_LEAD: "Sponsorluk Lideri",
   MEMBER: "Sponsorluk Ekibi",
   VIEWER: "Görüntüleyici",
+}
+
+export const ORGANIZATION_ROLE_RANK: Record<OrganizationRole, number> = {
+  OWNER: 4,
+  ADMIN: 3,
+  SPONSORSHIP_LEAD: 2,
+  MEMBER: 1,
+  VIEWER: 0,
+}
+
+/** Every role except OWNER — the roles the team UI can hand out. */
+export type AssignableRole = Exclude<OrganizationRole, "OWNER">
+
+/**
+ * Which roles `actor` is allowed to hand to another person — for both the
+ * invite form and role changes. OWNER is never grantable here (owner transfer
+ * is a separate, deferred flow). Enforced server-side in the team actions.
+ */
+export function grantableRoles(actor: OrganizationRole): AssignableRole[] {
+  switch (actor) {
+    case "OWNER":
+    case "ADMIN":
+      return ["ADMIN", "SPONSORSHIP_LEAD", "MEMBER", "VIEWER"]
+    case "SPONSORSHIP_LEAD":
+      return ["MEMBER", "VIEWER"]
+    default:
+      return []
+  }
+}
+
+export function canGrantRole(
+  actor: OrganizationRole,
+  target: OrganizationRole
+): boolean {
+  return (grantableRoles(actor) as OrganizationRole[]).includes(target)
+}
+
+/** Whether `actor` may change the role of / remove a member holding `current`. */
+export function canManageMember(
+  actor: OrganizationRole,
+  current: OrganizationRole
+): boolean {
+  if (current === "OWNER") return false
+  return (grantableRoles(actor) as OrganizationRole[]).includes(current)
 }

@@ -16,7 +16,10 @@ import {
   timelineGroupLabel,
 } from "@/lib/format"
 import { ActivityIcon } from "@/features/activities/components/activity-icon"
-import { ACTIVITY_TYPE_LABELS } from "@/features/activities/schema"
+import {
+  ACTIVITY_CHANNEL_LABELS,
+  ACTIVITY_KIND_LABELS,
+} from "@/features/activities/schema"
 import { StagePill } from "@/features/opportunities/components/stage-pill"
 import type { ActivityListItem } from "@/features/activities/queries"
 import type {
@@ -226,10 +229,13 @@ export function RecentActivityPanel({
         <ul className="divide-border divide-y">
           {activities.map((a) => (
             <li key={a.id} className="flex items-start gap-3 px-4 py-3">
-              <ActivityIcon type={a.type} />
+              <ActivityIcon channel={a.channel} direction={a.direction} />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <p className="text-sm leading-snug">
-                  {a.title?.trim() || ACTIVITY_TYPE_LABELS[a.type]}
+                  {a.title?.trim() ||
+                    (a.kind === "STAGE_CHANGE"
+                      ? ACTIVITY_KIND_LABELS[a.kind]
+                      : `${ACTIVITY_CHANNEL_LABELS[a.channel]} · ${ACTIVITY_KIND_LABELS[a.kind]}`)}
                   {a.description ? (
                     <span className="text-muted-foreground">
                       {" "}

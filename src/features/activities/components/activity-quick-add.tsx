@@ -19,12 +19,27 @@ import {
 import { toLocalInputValue } from "@/lib/format"
 import { logActivity } from "@/features/activities/actions"
 import {
-  ACTIVITY_TYPE_LABELS,
-  LOGGABLE_ACTIVITY_TYPES,
+  ACTIVITY_CHANNELS,
+  ACTIVITY_CHANNEL_LABELS,
+  ACTIVITY_DIRECTIONS,
+  ACTIVITY_DIRECTION_LABELS,
+  ACTIVITY_KIND_LABELS,
+  LOGGABLE_KINDS,
 } from "@/features/activities/schema"
+import type {
+  ActivityChannel,
+  ActivityDirection,
+} from "@/generated/prisma/enums"
 import type { ActivityListItem } from "@/features/activities/queries"
 
-export type ActivityContactOption = { id: string; name: string }
+export type ActivityContactOption = {
+  id: string
+  name: string
+  email?: string | null
+  linkedinUrl?: string | null
+}
+
+type LoggableKind = (typeof LOGGABLE_KINDS)[number]
 
 type Props = {
   open: boolean
@@ -38,7 +53,7 @@ type Props = {
 const selectClass =
   "border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
 
-export function ActivityQuickAdd({
+export function QuickLogCommunication({
   open,
   onOpenChange,
   opportunityId,
@@ -46,10 +61,11 @@ export function ActivityQuickAdd({
   contacts = [],
   onLogged,
 }: Props) {
-  const [type, setType] =
-    useState<(typeof LOGGABLE_ACTIVITY_TYPES)[number]>("NOTE")
-  const [occurredAt, setOccurredAt] = useState("")
+  const [channel, setChannel] = useState<ActivityChannel>("EMAIL")
+  const [direction, setDirection] = useState<ActivityDirection>("OUTBOUND")
+  const [kind, setKind] = useState<LoggableKind>("INITIAL_CONTACT")
   const [contactId, setContactId] = useState("")
+  const [occurredAt, setOccurredAt] = useState("")
   const [description, setDescription] = useState("")
   const [isPending, startTransition] = useTransition()
 
@@ -57,17 +73,24 @@ export function ActivityQuickAdd({
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) {
-      setType("NOTE")
-      setOccurredAt(toLocalInputValue(new Date()))
+      setChannel("EMAIL")
+      setDirection("OUTBOUND")
+      setKind("INITIAL_CONTACT")
       setContactId("")
+      setOccurredAt(toLocalInputValue(new Date()))
       setDescription("")
     }
   }
 
+  const isInternal = channel === "INTERNAL"
+  const selectedContact = contacts.find((c) => c.id === contactId)
+
   function onSubmit() {
     startTransition(async () => {
       const result = await logActivity({
-        type,
+        channel,
+        direction: isInternal ? "INTERNAL" : direction,
+        kind,
         occurredAt,
         opportunityId,
         companyId,
@@ -75,7 +98,7 @@ export function ActivityQuickAdd({
         description: description || undefined,
       })
       if (result.ok) {
-        toast.success("Aktivite kaydedildi.")
+        toast.success("İletişim kaydedildi.")
         onLogged(result.activity)
         onOpenChange(false)
       } else {
@@ -88,40 +111,64 @@ export function ActivityQuickAdd({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Aktivite ekle</DialogTitle>
+          <DialogTitle>İletişim ekle</DialogTitle>
           <DialogDescription>
-            Yapılan bir görüşmeyi, e-postayı veya notu kaydet. E-posta türü
-            posta göndermez, yalnızca kayıt oluşturur.
+            Yapılan bir görüşmeyi, mesajı veya notu kaydet. E-posta / LinkedIn
+            türü mesaj göndermez — yalnızca kayıt oluşturur.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Kanal</span>
+              <select
+                className={selectClass}
+                value={channel}
+                onChange={(e) =>
+                  setChannel(e.target.value as ActivityChannel)
+                }
+              >
+                {ACTIVITY_CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {ACTIVITY_CHANNEL_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Yön</span>
+              <select
+                className={selectClass}
+                value={isInternal ? "INTERNAL" : direction}
+                disabled={isInternal}
+                onChange={(e) =>
+                  setDirection(e.target.value as ActivityDirection)
+                }
+              >
+                {ACTIVITY_DIRECTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {ACTIVITY_DIRECTION_LABELS[d]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Tür</span>
             <select
               className={selectClass}
-              value={type}
-              onChange={(e) =>
-                setType(
-                  e.target.value as (typeof LOGGABLE_ACTIVITY_TYPES)[number]
-                )
-              }
+              value={kind}
+              onChange={(e) => setKind(e.target.value as LoggableKind)}
             >
-              {LOGGABLE_ACTIVITY_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {ACTIVITY_TYPE_LABELS[t]}
+              {LOGGABLE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {ACTIVITY_KIND_LABELS[k]}
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Tarih ve saat</span>
-            <Input
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
           </label>
 
           {contacts.length > 0 ? (
@@ -139,17 +186,38 @@ export function ActivityQuickAdd({
                   </option>
                 ))}
               </select>
+              {selectedContact && channel === "EMAIL" && selectedContact.email ? (
+                <span className="text-muted-foreground text-xs">
+                  {selectedContact.email}
+                </span>
+              ) : null}
+              {selectedContact &&
+              channel === "LINKEDIN" &&
+              selectedContact.linkedinUrl ? (
+                <span className="text-muted-foreground truncate text-xs">
+                  {selectedContact.linkedinUrl}
+                </span>
+              ) : null}
             </label>
           ) : null}
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Açıklama</span>
+            <span className="font-medium">Tarih ve saat</span>
+            <Input
+              type="datetime-local"
+              value={occurredAt}
+              onChange={(e) => setOccurredAt(e.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Not</span>
             <Textarea
               rows={4}
               autoFocus
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Görüşmede konuşulanlar, sonraki adımlar…"
+              placeholder="Konuşulanlar, sonraki adımlar…"
             />
           </label>
         </div>

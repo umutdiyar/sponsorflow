@@ -39,12 +39,18 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
  * Command palette: navigates between pages and does a live, org-scoped company
  * lookup (type-ahead). Not a global search engine — one small query per keystroke.
  */
+const COMPANY_SEARCH_MIN = 3
+const COMPANY_SEARCH_DEBOUNCE = 400
+
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [hits, setHits] = useState<CompanySearchHit[]>([])
   const [isSearching, startSearch] = useTransition()
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Monotonic id so a slow response from an earlier keystroke can't clobber a
+  // newer one (poor-man's request cancellation for the remote lookup).
+  const requestSeq = useRef(0)
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -60,15 +66,21 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   function handleQueryChange(value: string) {
     setQuery(value)
     if (timer.current) clearTimeout(timer.current)
-    if (value.trim().length < 2) {
+    const trimmed = value.trim()
+    if (trimmed.length < COMPANY_SEARCH_MIN) {
       setHits([])
+      requestSeq.current++
       return
     }
     timer.current = setTimeout(() => {
+      const seq = ++requestSeq.current
       startSearch(async () => {
-        setHits(await quickSearchCompanies(value))
+        const result = await quickSearchCompanies(trimmed).catch(
+          () => [] as CompanySearchHit[]
+        )
+        if (seq === requestSeq.current) setHits(result)
       })
-    }, 250)
+    }, COMPANY_SEARCH_DEBOUNCE)
   }
 
   function go(href: string) {
@@ -87,7 +99,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         }
       }}
     >
-      <Command shouldFilter={query.trim().length < 2}>
+      <Command shouldFilter>
         <CommandInput
           placeholder="Firma veya sayfa ara…"
           value={query}
@@ -118,7 +130,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
             </CommandGroup>
           ) : null}
 
-          {query.trim().length >= 2 && isSearching && hits.length === 0 ? (
+          {query.trim().length >= COMPANY_SEARCH_MIN && isSearching && hits.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 px-2 py-3 text-sm">
               <Loader2Icon className="size-4 animate-spin" />
               Firmalar aranıyor…

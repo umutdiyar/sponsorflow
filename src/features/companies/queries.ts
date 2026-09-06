@@ -28,6 +28,7 @@ export type CompanyRow = {
   id: string
   name: string
   website: string | null
+  domain: string | null
   linkedinUrl: string | null
   industry: string | null
   source: string | null
@@ -93,6 +94,7 @@ export async function listCompanies({
       id: true,
       name: true,
       website: true,
+      domain: true,
       linkedinUrl: true,
       industry: true,
       source: true,
@@ -114,6 +116,7 @@ export async function listCompanies({
     id: c.id,
     name: c.name,
     website: c.website,
+    domain: c.domain,
     linkedinUrl: c.linkedinUrl,
     industry: c.industry,
     source: c.source,
@@ -229,3 +232,162 @@ export async function getCompanyById(organizationId: string, id: string) {
 export type CompanyDetail = NonNullable<
   Awaited<ReturnType<typeof getCompanyById>>
 >
+
+export type CompanyQuickView = {
+  id: string
+  name: string
+  website: string | null
+  linkedinUrl: string | null
+  industry: string | null
+  source: string | null
+  city: string | null
+  country: string | null
+  owner: MemberOption | null
+  contacts: {
+    id: string
+    name: string
+    jobTitle: string | null
+    email: string | null
+    linkedinUrl: string | null
+    isPrimary: boolean
+  }[]
+  opportunities: {
+    id: string
+    title: string
+    stageName: string
+    stageType: "OPEN" | "WON" | "LOST"
+    estimatedValue: number | null
+    currency: string
+  }[]
+  activities: {
+    id: string
+    channel: string
+    kind: string
+    direction: string
+    title: string | null
+    description: string | null
+    occurredAt: Date
+    author: string
+    contactName: string | null
+  }[]
+}
+
+/**
+ * On-demand payload for the company quick-view Sheet — the list itself stays
+ * lightweight and this only runs when a row is opened.
+ */
+export async function getCompanyQuickView(
+  organizationId: string,
+  companyId: string
+): Promise<CompanyQuickView | null> {
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, organizationId },
+    select: {
+      id: true,
+      name: true,
+      website: true,
+      linkedinUrl: true,
+      industry: true,
+      source: true,
+      city: true,
+      country: true,
+      owner: {
+        select: {
+          id: true,
+          profile: { select: { fullName: true, email: true } },
+        },
+      },
+    },
+  })
+  if (!company) return null
+
+  const [contacts, opportunities, activities] = await Promise.all([
+    prisma.contact.findMany({
+      where: { organizationId, companyId, archivedAt: null },
+      orderBy: [{ isPrimary: "desc" }, { firstName: "asc" }],
+      take: 20,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        email: true,
+        linkedinUrl: true,
+        isPrimary: true,
+      },
+    }),
+    prisma.opportunity.findMany({
+      where: { organizationId, companyId, archivedAt: null },
+      orderBy: { updatedAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        title: true,
+        estimatedValue: true,
+        currency: true,
+        stage: { select: { name: true, type: true } },
+      },
+    }),
+    prisma.activity.findMany({
+      where: { organizationId, companyId },
+      orderBy: [{ occurredAt: "desc" }],
+      take: 8,
+      select: {
+        id: true,
+        channel: true,
+        kind: true,
+        direction: true,
+        title: true,
+        description: true,
+        occurredAt: true,
+        contact: { select: { firstName: true, lastName: true } },
+        createdBy: {
+          select: { profile: { select: { fullName: true, email: true } } },
+        },
+      },
+    }),
+  ])
+
+  return {
+    id: company.id,
+    name: company.name,
+    website: company.website,
+    linkedinUrl: company.linkedinUrl,
+    industry: company.industry,
+    source: company.source,
+    city: company.city,
+    country: company.country,
+    owner: company.owner
+      ? { membershipId: company.owner.id, name: memberName(company.owner.profile) }
+      : null,
+    contacts: contacts.map((c) => ({
+      id: c.id,
+      name: `${c.firstName} ${c.lastName}`.trim(),
+      jobTitle: c.jobTitle,
+      email: c.email,
+      linkedinUrl: c.linkedinUrl,
+      isPrimary: c.isPrimary,
+    })),
+    opportunities: opportunities.map((o) => ({
+      id: o.id,
+      title: o.title,
+      stageName: o.stage.name,
+      stageType: o.stage.type,
+      estimatedValue: o.estimatedValue,
+      currency: o.currency,
+    })),
+    activities: activities.map((a) => ({
+      id: a.id,
+      channel: a.channel,
+      kind: a.kind,
+      direction: a.direction,
+      title: a.title,
+      description: a.description,
+      occurredAt: a.occurredAt,
+      author: memberName(a.createdBy.profile),
+      contactName: a.contact
+        ? `${a.contact.firstName} ${a.contact.lastName}`.trim()
+        : null,
+    })),
+  }
+}

@@ -66,6 +66,8 @@ export default async function CompaniesPage({
           create: hasPermission(membership.role, "company:create"),
           update: hasPermission(membership.role, "company:update"),
           archive: hasPermission(membership.role, "company:archive"),
+          assign: hasPermission(membership.role, "company:assign"),
+          logActivity: hasPermission(membership.role, "activity:create"),
         }}
       />
     </div>

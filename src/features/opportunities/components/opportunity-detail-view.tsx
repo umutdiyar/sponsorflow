@@ -23,7 +23,7 @@ import {
 import { StageChangeDialog } from "@/features/opportunities/components/stage-change-dialog"
 import { NextActionDialog } from "@/features/opportunities/components/next-action-dialog"
 import { ArchiveOpportunityDialog } from "@/features/opportunities/components/archive-opportunity-dialog"
-import { ActivityQuickAdd } from "@/features/activities/components/activity-quick-add"
+import { QuickLogCommunication } from "@/features/activities/components/activity-quick-add"
 import { ActivityTimeline } from "@/features/activities/components/activity-timeline"
 import { TaskFormSheet } from "@/features/tasks/components/task-form-sheet"
 import { TaskMiniList } from "@/features/tasks/components/task-mini-list"
@@ -391,7 +391,7 @@ export function OpportunityDetailView({
         nextActionAt={o.nextActionAt}
         onSaved={() => {}}
       />
-      <ActivityQuickAdd
+      <QuickLogCommunication
         open={activityOpen}
         onOpenChange={setActivityOpen}
         opportunityId={o.id}

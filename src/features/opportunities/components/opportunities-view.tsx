@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/common/empty-state"
 import { formatDate, formatMoney, formatRelativeDay } from "@/lib/format"
 import { StagePill } from "@/features/opportunities/components/stage-pill"
 import { OpportunityFormSheet } from "@/features/opportunities/components/opportunity-form-sheet"
+import { OpportunityQuickViewSheet } from "@/features/opportunities/components/opportunity-quick-view-sheet"
 import type {
+  OpportunityOption,
   OpportunityRow,
   OpportunityStatus,
 } from "@/features/opportunities/queries"
@@ -46,6 +48,12 @@ type Props = {
   companies: CompanyRef[]
   filters: Filters
   canCreate: boolean
+  can: {
+    update: boolean
+    changeStage: boolean
+    createActivity: boolean
+    createTask: boolean
+  }
 }
 
 const selectClass =
@@ -59,6 +67,7 @@ export function OpportunitiesView({
   companies,
   filters,
   canCreate,
+  can,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -68,6 +77,25 @@ export function OpportunitiesView({
   const [createOpen, setCreateOpen] = useState(
     () => searchParams.get("new") === "1"
   )
+  const defaultCompanyId = searchParams.get("company") ?? undefined
+  const [quickViewId, setQuickViewId] = useState<string | null>(
+    () => searchParams.get("opportunity")
+  )
+
+  const opportunityOptions: OpportunityOption[] = useMemo(
+    () =>
+      opportunities.map((o) => ({
+        id: o.id,
+        title: o.title,
+        companyId: o.companyId,
+        companyName: o.companyName,
+      })),
+    [opportunities]
+  )
+
+  function openQuickView(id: string) {
+    setQuickViewId(id)
+  }
 
   const setParam = useCallback(
     (key: string, value: string) => {
@@ -240,22 +268,22 @@ export function OpportunitiesView({
             </thead>
             <tbody className="divide-border divide-y">
               {opportunities.map((o) => (
-                <tr key={o.id} className="hover:bg-muted/40">
+                <tr
+                  key={o.id}
+                  onClick={() => openQuickView(o.id)}
+                  className="hover:bg-muted/40 cursor-pointer transition-colors"
+                >
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <Link
                       href={`/companies/${o.companyId}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-muted-foreground hover:text-foreground hover:underline"
                     >
                       {o.companyName}
                     </Link>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <Link
-                      href={`/opportunities/${o.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {o.title}
-                    </Link>
+                  <td className="px-3 py-2.5 font-medium whitespace-nowrap">
+                    {o.title}
                   </td>
                   <td className="px-3 py-2.5">
                     <StagePill name={o.stage.name} type={o.stage.type} />
@@ -303,7 +331,20 @@ export function OpportunitiesView({
         members={members}
         stages={stages}
         packages={packages}
-        onSaved={(id) => router.push(`/opportunities/${id}`)}
+        defaultCompanyId={defaultCompanyId}
+        onSaved={(id) => openQuickView(id)}
+      />
+
+      <OpportunityQuickViewSheet
+        opportunityId={quickViewId}
+        onOpenChange={(o) => {
+          if (!o) setQuickViewId(null)
+        }}
+        stages={stages}
+        members={members}
+        companies={companies}
+        opportunityOptions={opportunityOptions}
+        can={can}
       />
     </div>
   )

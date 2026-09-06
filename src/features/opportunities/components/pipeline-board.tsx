@@ -17,18 +17,36 @@ import {
 } from "@dnd-kit/core"
 import { toast } from "sonner"
 
+import { InfoIcon, XIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
+import { usePersistentBoolean } from "@/hooks/use-persistent-boolean"
 import { formatMoneyCompact } from "@/lib/format"
 import { changeOpportunityStage } from "@/features/opportunities/actions"
 import { PipelineCard } from "@/features/opportunities/components/pipeline-card"
 import { LostReasonDialog } from "@/features/opportunities/components/lost-reason-dialog"
-import type { OpportunityRow } from "@/features/opportunities/queries"
-import type { StageRef } from "@/lib/org/reference"
+import { OpportunityQuickViewSheet } from "@/features/opportunities/components/opportunity-quick-view-sheet"
+import type {
+  OpportunityOption,
+  OpportunityRow,
+} from "@/features/opportunities/queries"
+import type { StageRef, MemberRef, CompanyRef } from "@/lib/org/reference"
+
+const DRAG_HINT_KEY = "sponsorflow:pipeline:drag-hint-seen"
 
 type Props = {
   stages: StageRef[]
   opportunities: OpportunityRow[]
   canMove: boolean
+  members: MemberRef[]
+  companies: CompanyRef[]
+  opportunityOptions: OpportunityOption[]
+  can: {
+    update: boolean
+    changeStage: boolean
+    createActivity: boolean
+    createTask: boolean
+  }
 }
 
 type Columns = Record<string, OpportunityRow[]>
@@ -45,9 +63,22 @@ function groupByStage(
   return cols
 }
 
-export function PipelineBoard({ stages, opportunities, canMove }: Props) {
+export function PipelineBoard({
+  stages,
+  opportunities,
+  canMove,
+  members,
+  companies,
+  opportunityOptions,
+  can,
+}: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [hintDismissed, setHintDismissed] = usePersistentBoolean(
+    DRAG_HINT_KEY,
+    false
+  )
 
   const signature = useMemo(
     () =>
@@ -146,6 +177,24 @@ export function PipelineBoard({ stages, opportunities, canMove }: Props) {
 
   return (
     <>
+      {canMove && !hintDismissed ? (
+        <div className="text-muted-foreground animate-in fade-in-0 mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+          <InfoIcon className="size-3.5 shrink-0" />
+          <span className="flex-1">
+            Kartın sağındaki tutamağı sürükleyerek fırsatı başka aşamaya
+            taşıyabilirsin. Karta tıklayınca hızlı görünüm açılır.
+          </span>
+          <button
+            type="button"
+            onClick={() => setHintDismissed(true)}
+            aria-label="Kapat"
+            className="hover:text-foreground rounded p-0.5"
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -161,6 +210,7 @@ export function PipelineBoard({ stages, opportunities, canMove }: Props) {
               items={columns[stage.id] ?? []}
               canMove={canMove}
               activeId={activeId}
+              onOpen={setOpenId}
             />
           ))}
         </div>
@@ -184,6 +234,19 @@ export function PipelineBoard({ stages, opportunities, canMove }: Props) {
           router.refresh()
         }}
       />
+
+      <OpportunityQuickViewSheet
+        opportunityId={openId}
+        onOpenChange={(open) => {
+          if (!open) setOpenId(null)
+        }}
+        stages={stages}
+        members={members}
+        companies={companies}
+        opportunityOptions={opportunityOptions}
+        can={can}
+        onMutated={() => router.refresh()}
+      />
     </>
   )
 }
@@ -193,11 +256,13 @@ function Column({
   items,
   canMove,
   activeId,
+  onOpen,
 }: {
   stage: StageRef
   items: OpportunityRow[]
   canMove: boolean
   activeId: string | null
+  onOpen: (id: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
@@ -240,6 +305,7 @@ function Column({
               opp={opp}
               canMove={canMove}
               dragging={activeId === opp.id}
+              onOpen={onOpen}
             />
           ))
         )}
@@ -252,10 +318,12 @@ function DraggableCard({
   opp,
   canMove,
   dragging,
+  onOpen,
 }: {
   opp: OpportunityRow
   canMove: boolean
   dragging: boolean
+  onOpen: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef } =
     useDraggable({ id: opp.id, disabled: !canMove })
@@ -266,6 +334,7 @@ function DraggableCard({
         opportunity={opp}
         canMove={canMove}
         dragging={dragging}
+        onOpen={onOpen}
         handleRef={canMove ? setActivatorNodeRef : undefined}
         handleProps={
           canMove ? { ...attributes, ...listeners } : undefined

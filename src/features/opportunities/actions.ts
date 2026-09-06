@@ -7,6 +7,16 @@ import { ForbiddenError, requirePermission } from "@/lib/auth/membership"
 import { parseIstanbulDate } from "@/lib/format"
 import { recordStageChange } from "@/features/activities/internal"
 import {
+  listOpportunityActivities,
+  type ActivityListItem,
+} from "@/features/activities/queries"
+import { listContactOptions, type ContactOptionRef } from "@/lib/org/reference"
+import { listOpportunityTasks, type TaskRow } from "@/features/tasks/queries"
+import {
+  getOpportunityById,
+  type OpportunityDetail,
+} from "@/features/opportunities/queries"
+import {
   nextActionSchema,
   opportunityFormSchema,
   stageChangeSchema,
@@ -349,6 +359,32 @@ export async function updateNextAction(
   } catch (error) {
     return failure(error, "updateNextAction")
   }
+}
+
+export type OpportunityQuickView = {
+  opportunity: OpportunityDetail
+  activities: ActivityListItem[]
+  tasks: TaskRow[]
+  contacts: ContactOptionRef[]
+}
+
+/** On-demand payload for the opportunity quick-view drawer. */
+export async function fetchOpportunityQuickView(
+  opportunityId: string
+): Promise<OpportunityQuickView | null> {
+  const membership = await requirePermission("opportunity:read")
+  const orgId = membership.organizationId
+
+  const opportunity = await getOpportunityById(orgId, opportunityId)
+  if (!opportunity) return null
+
+  const [activities, tasks, contacts] = await Promise.all([
+    listOpportunityActivities(orgId, opportunityId, 30),
+    listOpportunityTasks(orgId, opportunityId),
+    listContactOptions(orgId, opportunity.companyId),
+  ])
+
+  return { opportunity, activities, tasks, contacts }
 }
 
 function revalidateOpportunity(id: string) {

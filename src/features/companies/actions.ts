@@ -115,6 +115,107 @@ export async function updateCompany(
   }
 }
 
+export type AssignOwnerResult =
+  | { ok: true; ownerMembershipId: string | null }
+  | { ok: false; error: string }
+
+/**
+ * Quick owner (re)assignment from the companies list. Optimistic on the client;
+ * this only persists + invalidates the cache (no page re-render is forced).
+ */
+export async function assignCompanyOwner(
+  companyId: string,
+  ownerMembershipId: string | null
+): Promise<AssignOwnerResult> {
+  try {
+    const membership = await requirePermission("company:assign")
+
+    if (ownerMembershipId) {
+      const owner = await prisma.organizationMembership.findFirst({
+        where: {
+          id: ownerMembershipId,
+          organizationId: membership.organizationId,
+          deactivatedAt: null,
+        },
+        select: { id: true },
+      })
+      if (!owner) {
+        return { ok: false, error: "Seçilen sorumlu bu organizasyona ait değil." }
+      }
+    }
+
+    const result = await prisma.company.updateMany({
+      where: {
+        id: companyId,
+        organizationId: membership.organizationId,
+        archivedAt: null,
+      },
+      data: { ownerMembershipId },
+    })
+    if (result.count === 0) {
+      return { ok: false, error: "Firma bulunamadı." }
+    }
+
+    revalidatePath("/companies")
+    revalidatePath(`/companies/${companyId}`)
+    revalidatePath("/team")
+    return { ok: true, ownerMembershipId }
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: error.message }
+    }
+    console.error("assignCompanyOwner", error)
+    return { ok: false, error: GENERIC }
+  }
+}
+
+export async function bulkAssignCompanyOwner(
+  companyIds: string[],
+  ownerMembershipId: string | null
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  try {
+    const membership = await requirePermission("company:assign")
+
+    const ids = [...new Set(companyIds)].filter(Boolean).slice(0, 500)
+    if (ids.length === 0) {
+      return { ok: false, error: "Firma seçilmedi." }
+    }
+
+    if (ownerMembershipId) {
+      const owner = await prisma.organizationMembership.findFirst({
+        where: {
+          id: ownerMembershipId,
+          organizationId: membership.organizationId,
+          deactivatedAt: null,
+        },
+        select: { id: true },
+      })
+      if (!owner) {
+        return { ok: false, error: "Seçilen sorumlu bu organizasyona ait değil." }
+      }
+    }
+
+    const result = await prisma.company.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId: membership.organizationId,
+        archivedAt: null,
+      },
+      data: { ownerMembershipId },
+    })
+
+    revalidatePath("/companies")
+    revalidatePath("/team")
+    return { ok: true, count: result.count }
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: error.message }
+    }
+    console.error("bulkAssignCompanyOwner", error)
+    return { ok: false, error: GENERIC }
+  }
+}
+
 export async function archiveCompany(
   id: string
 ): Promise<CompanyActionResult> {

@@ -42,7 +42,9 @@ enum PipelineStageType {
   LOST
 }
 
-/// What happened on a company / opportunity — a past event, logged after the fact.
+/// Legacy single-axis activity classification. Kept for backwards
+/// compatibility; new code reads/writes `channel` + `kind` + `direction` and
+/// derives this value on write.
 enum ActivityType {
   EMAIL
   PHONE
@@ -53,6 +55,43 @@ enum ActivityType {
   PROPOSAL
   FOLLOW_UP
   STAGE_CHANGE
+}
+
+/// The medium a communication happened through.
+enum ActivityChannel {
+  EMAIL
+  LINKEDIN
+  WHATSAPP
+  PHONE
+  MEETING
+  OTHER
+  INTERNAL
+}
+
+/// The intent / nature of the logged activity.
+enum ActivityKind {
+  INITIAL_CONTACT
+  FOLLOW_UP
+  RESPONSE
+  PROPOSAL
+  MEETING_NOTE
+  NOTE
+  STAGE_CHANGE
+}
+
+/// Who reached out to whom.
+enum ActivityDirection {
+  OUTBOUND
+  INBOUND
+  INTERNAL
+}
+
+/// Lifecycle of a team invitation.
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
 }
 
 /// How urgent a task is.
@@ -110,6 +149,7 @@ model Organization {
   activities          Activity[]
   tasks               Task[]
   sponsorshipPackages SponsorshipPackage[]
+  invitations         OrganizationInvitation[]
 }
 
 model OrganizationMembership {
@@ -119,6 +159,9 @@ model OrganizationMembership {
   role           OrganizationRole @default(MEMBER)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+  /// Soft-removal: a deactivated membership keeps its history rows intact
+  /// (createdBy FKs are Restrict) but grants no access.
+  deactivatedAt  DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   profile      Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -127,14 +170,44 @@ model OrganizationMembership {
   createdCompanies Company[] @relation("CompanyCreatedBy")
   createdContacts  Contact[] @relation("ContactCreatedBy")
 
-  ownedOpportunities   Opportunity[] @relation("OpportunityOwner")
-  createdOpportunities Opportunity[] @relation("OpportunityCreatedBy")
-  createdActivities    Activity[]    @relation("ActivityCreatedBy")
-  assignedTasks        Task[]        @relation("TaskAssignee")
-  createdTasks         Task[]        @relation("TaskCreatedBy")
+  ownedOpportunities   Opportunity[]            @relation("OpportunityOwner")
+  createdOpportunities Opportunity[]            @relation("OpportunityCreatedBy")
+  createdActivities    Activity[]               @relation("ActivityCreatedBy")
+  assignedTasks        Task[]                   @relation("TaskAssignee")
+  createdTasks         Task[]                   @relation("TaskCreatedBy")
+  sentInvitations      OrganizationInvitation[] @relation("InvitationInvitedBy")
 
   @@unique([organizationId, profileId])
   @@index([profileId])
+}
+
+/// A pending / historical invitation to join an organization. One row per
+/// (organization, email) — a re-invite updates the existing row rather than
+/// creating a duplicate. The row is the source of truth for the role a new
+/// member gets; invite-link metadata is never trusted directly.
+model OrganizationInvitation {
+  id             String @id @default(cuid())
+  organizationId String
+
+  email    String
+  fullName String?
+  role     OrganizationRole
+
+  invitedByMembershipId String
+
+  status    InvitationStatus @default(PENDING)
+  expiresAt DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  acceptedAt DateTime?
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    OrganizationMembership @relation("InvitationInvitedBy", fields: [invitedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([email])
 }
 
 // ---------------------------------------------------------------------------
@@ -325,10 +398,14 @@ model Activity {
 
   createdByMembershipId String
 
+  /// Legacy classification, derived from `kind`/`channel` on write.
   type        ActivityType
+  channel     ActivityChannel   @default(OTHER)
+  kind        ActivityKind      @default(NOTE)
+  direction   ActivityDirection @default(OUTBOUND)
   title       String?
   description String?
-  occurredAt  DateTime     @default(now())
+  occurredAt  DateTime          @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -341,6 +418,7 @@ model Activity {
 
   @@index([organizationId, occurredAt])
   @@index([companyId, occurredAt])
+  @@index([contactId, occurredAt])
   @@index([opportunityId, occurredAt])
   @@index([createdByMembershipId])
 }

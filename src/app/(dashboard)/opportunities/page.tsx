@@ -68,6 +68,12 @@ export default async function OpportunitiesPage({
           status,
         }}
         canCreate={hasPermission(membership.role, "opportunity:create")}
+        can={{
+          update: hasPermission(membership.role, "opportunity:update"),
+          changeStage: hasPermission(membership.role, "pipeline:update"),
+          createActivity: hasPermission(membership.role, "activity:create"),
+          createTask: hasPermission(membership.role, "task:create"),
+        }}
       />
     </div>
   )

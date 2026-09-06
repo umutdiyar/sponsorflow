@@ -75,7 +75,12 @@ export async function listCompanyOptions(
   return rows
 }
 
-export type ContactOptionRef = { id: string; name: string }
+export type ContactOptionRef = {
+  id: string
+  name: string
+  email: string | null
+  linkedinUrl: string | null
+}
 
 export async function listContactOptions(
   organizationId: string,
@@ -83,12 +88,20 @@ export async function listContactOptions(
 ): Promise<ContactOptionRef[]> {
   const rows = await prisma.contact.findMany({
     where: { organizationId, companyId, archivedAt: null },
-    select: { id: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      linkedinUrl: true,
+    },
     orderBy: [{ isPrimary: "desc" }, { firstName: "asc" }],
   })
   return rows.map((r) => ({
     id: r.id,
     name: `${r.firstName} ${r.lastName}`.trim(),
+    email: r.email,
+    linkedinUrl: r.linkedinUrl,
   }))
 }
 

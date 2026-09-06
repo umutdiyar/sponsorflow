@@ -5,9 +5,10 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import { ForbiddenError, requirePermission } from "@/lib/auth/membership"
 import { parseIstanbulLocal } from "@/lib/format"
+import { deriveLegacyType } from "@/features/activities/internal"
 import {
-  activityFormSchema,
-  type ActivityFormInput,
+  communicationFormSchema,
+  type CommunicationFormInput,
 } from "@/features/activities/schema"
 import {
   getActivitiesFeed,
@@ -26,9 +27,9 @@ function memberName(profile: { fullName: string | null; email: string }) {
 }
 
 export async function logActivity(
-  input: ActivityFormInput
+  input: CommunicationFormInput
 ): Promise<ActivityActionResult> {
-  const parsed = activityFormSchema.safeParse(input)
+  const parsed = communicationFormSchema.safeParse(input)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? GENERIC }
   }
@@ -39,12 +40,8 @@ export async function logActivity(
     const orgId = membership.organizationId
 
     const occurredAt = parseIstanbulLocal(data.occurredAt)
-    if (!occurredAt) {
-      return { ok: false, error: "Geçerli bir tarih gir." }
-    }
+    if (!occurredAt) return { ok: false, error: "Geçerli bir tarih gir." }
 
-    // Resolve the company. If an opportunity is given, its company wins and is
-    // verified to belong to this org (IDOR guard).
     let companyId = data.companyId ?? null
     let opportunityId: string | null = null
 
@@ -58,9 +55,7 @@ export async function logActivity(
       companyId = opp.companyId
     }
 
-    if (!companyId) {
-      return { ok: false, error: "Firma bulunamadı." }
-    }
+    if (!companyId) return { ok: false, error: "Firma bulunamadı." }
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, organizationId: orgId },
@@ -68,20 +63,19 @@ export async function logActivity(
     })
     if (!company) return { ok: false, error: "Firma bulunamadı." }
 
-    // Contact (optional) must belong to the same company.
     if (data.contactId) {
       const contact = await prisma.contact.findFirst({
-        where: {
-          id: data.contactId,
-          organizationId: orgId,
-          companyId,
-        },
+        where: { id: data.contactId, organizationId: orgId, companyId },
         select: { id: true },
       })
       if (!contact) {
         return { ok: false, error: "Seçilen kişi bu firmaya ait değil." }
       }
     }
+
+    // INTERNAL channel is always an internal note.
+    const direction =
+      data.channel === "INTERNAL" ? "INTERNAL" : data.direction
 
     const created = await prisma.activity.create({
       data: {
@@ -90,14 +84,19 @@ export async function logActivity(
         opportunityId,
         contactId: data.contactId ?? null,
         createdByMembershipId: membership.membershipId,
-        type: data.type,
+        type: deriveLegacyType(data.channel, data.kind),
+        channel: data.channel,
+        kind: data.kind,
+        direction,
         title: data.title ?? null,
         description: data.description ?? null,
         occurredAt,
       },
       select: {
         id: true,
-        type: true,
+        channel: true,
+        kind: true,
+        direction: true,
         title: true,
         description: true,
         occurredAt: true,
@@ -117,12 +116,16 @@ export async function logActivity(
     revalidatePath("/dashboard")
     if (opportunityId) revalidatePath(`/opportunities/${opportunityId}`)
     revalidatePath(`/companies/${companyId}`)
+    revalidatePath("/companies")
+    revalidatePath("/contacts")
 
     return {
       ok: true,
       activity: {
         id: created.id,
-        type: created.type,
+        channel: created.channel,
+        kind: created.kind,
+        direction: created.direction,
         title: created.title,
         description: created.description,
         occurredAt: created.occurredAt,
@@ -147,7 +150,9 @@ export async function logActivity(
 }
 
 export type ActivityFeedInput = {
-  type?: string
+  channel?: string
+  kind?: string
+  direction?: string
   memberId?: string
   companyId?: string
   from?: string
@@ -155,14 +160,15 @@ export type ActivityFeedInput = {
   cursor?: string
 }
 
-/** Read one page of the global feed — used for "load more" in the client. */
 export async function fetchActivityPage(
   input: ActivityFeedInput
 ): Promise<ActivityFeedResult> {
   const membership = await requirePermission("activity:read")
   return getActivitiesFeed({
     organizationId: membership.organizationId,
-    type: input.type,
+    channel: input.channel,
+    kind: input.kind,
+    direction: input.direction,
     memberId: input.memberId,
     companyId: input.companyId,
     from: input.from,

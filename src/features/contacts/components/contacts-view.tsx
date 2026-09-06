@@ -6,10 +6,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArchiveIcon,
   Loader2Icon,
+  MailIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PhoneIcon,
   PlusIcon,
   SearchIcon,
+  Share2Icon,
   StarIcon,
   UsersIcon,
 } from "lucide-react"
@@ -38,7 +41,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { EmptyState } from "@/components/common/empty-state"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatTimeAgo } from "@/lib/format"
 import {
   archiveContact,
   createContact,
@@ -48,8 +51,11 @@ import {
   contactFormSchema,
   type ContactFormInput,
 } from "@/features/contacts/schema"
+import { ACTIVITY_CHANNEL_LABELS } from "@/features/activities/schema"
 import type { ContactRow } from "@/features/contacts/queries"
 import type { CompanyRef } from "@/lib/org/reference"
+
+const CHANNEL_LABELS = ACTIVITY_CHANNEL_LABELS
 
 type Props = {
   contacts: ContactRow[]
@@ -176,63 +182,106 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-200 border-collapse text-sm">
-            <thead>
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-background sticky top-0 z-10">
               <tr className="text-muted-foreground border-b text-left text-xs">
                 <th className="px-3 py-2 font-medium">Kişi</th>
-                <th className="px-3 py-2 font-medium">Firma</th>
-                <th className="px-3 py-2 font-medium">Pozisyon</th>
-                <th className="px-3 py-2 font-medium">E-posta</th>
-                <th className="px-3 py-2 font-medium">Telefon</th>
-                <th className="px-3 py-2 font-medium">Birincil</th>
-                <th className="px-3 py-2 font-medium">Güncellendi</th>
+                <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                  İletişim
+                </th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                  Son İletişim
+                </th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                  Sorumlu
+                </th>
+                <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                  Güncellendi
+                </th>
                 <th className="w-8 px-3 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {contacts.map((c) => (
-                <tr key={c.id} className="hover:bg-muted/40">
-                  <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                    {c.firstName} {c.lastName}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <Link
-                      href={`/companies/${c.companyId}`}
-                      className="text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {c.companyName}
-                    </Link>
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2.5 whitespace-nowrap">
-                    {[c.jobTitle, c.department].filter(Boolean).join(" · ") ||
-                      "—"}
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2.5 whitespace-nowrap">
-                    {c.email ? (
-                      <a
-                        href={`mailto:${c.email}`}
-                        className="hover:text-foreground hover:underline"
-                      >
-                        {c.email}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2.5 whitespace-nowrap">
-                    {c.phone ?? "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {c.isPrimary ? (
-                      <StarIcon className="text-brand size-4" />
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2.5 tabular-nums whitespace-nowrap">
-                    {formatDate(c.updatedAt)}
-                  </td>
-                  <td className="px-3 py-2.5">
+              {contacts.map((c) => {
+                return (
+                  <tr key={c.id} className="hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {c.firstName} {c.lastName}
+                          {c.isPrimary ? (
+                            <StarIcon className="text-brand size-3.5" />
+                          ) : null}
+                        </span>
+                        <span className="text-muted-foreground truncate text-xs">
+                          {[c.jobTitle, c.department]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}{" "}
+                          ·{" "}
+                          <Link
+                            href={`/companies/${c.companyId}`}
+                            className="hover:text-foreground hover:underline"
+                          >
+                            {c.companyName}
+                          </Link>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="hidden px-3 py-2 whitespace-nowrap sm:table-cell">
+                      <div className="flex items-center gap-1">
+                        {c.email ? (
+                          <a
+                            href={`mailto:${c.email}`}
+                            aria-label={`${c.firstName} e-posta gönder`}
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1"
+                          >
+                            <MailIcon className="size-3.5" />
+                          </a>
+                        ) : null}
+                        {c.linkedinUrl ? (
+                          <a
+                            href={c.linkedinUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`${c.firstName} LinkedIn`}
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1"
+                          >
+                            <Share2Icon className="size-3.5" />
+                          </a>
+                        ) : null}
+                        {c.phone ? (
+                          <a
+                            href={`tel:${c.phone}`}
+                            aria-label={`${c.firstName} ara`}
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-1"
+                          >
+                            <PhoneIcon className="size-3.5" />
+                          </a>
+                        ) : null}
+                        {!c.email && !c.linkedinUrl && !c.phone ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
+                      {c.lastContactAt ? (
+                        <span>
+                          {formatTimeAgo(c.lastContactAt)}
+                          {c.lastContactChannel
+                            ? ` · ${CHANNEL_LABELS[c.lastContactChannel]}`
+                            : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
+                      {c.companyOwnerName ?? "—"}
+                    </td>
+                    <td className="text-muted-foreground hidden px-3 py-2 tabular-nums whitespace-nowrap sm:table-cell">
+                      {formatDate(c.updatedAt)}
+                    </td>
+                    <td className="px-3 py-2">
                     {can.update || can.archive ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -268,9 +317,10 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : null}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

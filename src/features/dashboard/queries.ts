@@ -117,7 +117,7 @@ export async function getDashboardData(
       _sum: { estimatedValue: true },
     }),
     prisma.activity.count({
-      where: { organizationId, type: "PROPOSAL" },
+      where: { organizationId, kind: "PROPOSAL" },
     }),
     listUpcomingTasks(organizationId, 12),
     prisma.opportunity.findMany({

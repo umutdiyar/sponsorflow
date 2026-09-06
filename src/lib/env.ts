@@ -55,3 +55,27 @@ export function getSupabaseConfig() {
 export function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
 }
+
+const secretSchema = z.object({
+  SUPABASE_SECRET_KEY: z
+    .string()
+    .min(1, "eksik — Supabase service_role / secret key gerekli"),
+})
+
+let secretCache: z.infer<typeof secretSchema> | null = null
+
+/**
+ * Server-only. The Supabase secret (service_role) key, used exclusively by the
+ * admin client in `src/lib/supabase/admin.ts`. Never import this from a module
+ * that can reach the browser bundle.
+ */
+export function getSupabaseSecretKey() {
+  if (!secretCache) {
+    secretCache = readValidated(
+      secretSchema,
+      { SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY },
+      "Supabase Dashboard -> Project Settings -> API -> service_role / secret key değerini `.env` dosyasına ekle."
+    )
+  }
+  return secretCache.SUPABASE_SECRET_KEY
+}

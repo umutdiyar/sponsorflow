@@ -7,16 +7,26 @@ import { hasPermission } from "@/lib/auth/permissions"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/empty-state"
+import { listCompanyOptions, listMembers } from "@/lib/org/reference"
 import { PipelineBoard } from "@/features/opportunities/components/pipeline-board"
-import { getPipelineBoardData } from "@/features/opportunities/queries"
+import {
+  getPipelineBoardData,
+  listOpportunityOptions,
+} from "@/features/opportunities/queries"
 
 export const metadata: Metadata = { title: "Pipeline" }
 
 export default async function PipelinePage() {
   const membership = await requirePermission("opportunity:read")
-  const { stages, opportunities } = await getPipelineBoardData(
-    membership.organizationId
-  )
+
+  const [{ stages, opportunities }, members, companies, opportunityOptions] =
+    await Promise.all([
+      getPipelineBoardData(membership.organizationId),
+      listMembers(membership.organizationId),
+      listCompanyOptions(membership.organizationId),
+      listOpportunityOptions(membership.organizationId),
+    ])
+
   const canCreate = hasPermission(membership.role, "opportunity:create")
   const canMove = hasPermission(membership.role, "pipeline:update")
 
@@ -27,7 +37,10 @@ export default async function PipelinePage() {
         description="Fırsatları aşamalar arasında sürükleyerek sponsorluk hattını yönet."
         actions={
           canCreate ? (
-            <Button render={<Link href="/opportunities?new=1" />} nativeButton={false}>
+            <Button
+              render={<Link href="/opportunities?new=1" />}
+              nativeButton={false}
+            >
               <PlusIcon />
               Fırsat Ekle
             </Button>
@@ -63,6 +76,15 @@ export default async function PipelinePage() {
           stages={stages}
           opportunities={opportunities}
           canMove={canMove}
+          members={members}
+          companies={companies}
+          opportunityOptions={opportunityOptions}
+          can={{
+            update: hasPermission(membership.role, "opportunity:update"),
+            changeStage: canMove,
+            createActivity: hasPermission(membership.role, "activity:create"),
+            createTask: hasPermission(membership.role, "task:create"),
+          }}
         />
       )}
     </div>
