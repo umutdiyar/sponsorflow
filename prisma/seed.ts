@@ -27,15 +27,12 @@ const ORG = {
 }
 
 const STAGES: { name: string; key: string; type: PipelineStageType }[] = [
-  { name: "Araştırma", key: "research", type: "OPEN" },
-  { name: "İletişim Bulundu", key: "contact-found", type: "OPEN" },
+  { name: "Araştırılıyor", key: "researching", type: "OPEN" },
   { name: "İletişime Geçildi", key: "contacted", type: "OPEN" },
-  { name: "Yanıt Alındı", key: "replied", type: "OPEN" },
-  { name: "Görüşme", key: "meeting", type: "OPEN" },
-  { name: "Teklif", key: "proposal", type: "OPEN" },
-  { name: "Müzakere", key: "negotiation", type: "OPEN" },
-  { name: "Kazanıldı", key: "won", type: "WON" },
-  { name: "Kaybedildi", key: "lost", type: "LOST" },
+  { name: "Görüşülüyor", key: "in-discussion", type: "OPEN" },
+  { name: "Yanıt Alındı", key: "responded", type: "OPEN" },
+  { name: "Olumlu", key: "positive", type: "WON" },
+  { name: "Olumsuz", key: "negative", type: "LOST" },
 ]
 
 async function main() {
@@ -58,10 +55,28 @@ async function main() {
         type: stage.type,
         position: index,
       },
-      update: { name: stage.name, type: stage.type, position: index },
+      update: {
+        name: stage.name,
+        type: stage.type,
+        position: index,
+        isActive: true,
+      },
     })
   }
-  console.log(`✓ ${STAGES.length} pipeline stages`)
+
+  // Self-heal: retire any non-canonical stage left over from an older seed.
+  const retired = await prisma.pipelineStage.updateMany({
+    where: {
+      organizationId: org.id,
+      key: { notIn: STAGES.map((s) => s.key) },
+      isActive: true,
+    },
+    data: { isActive: false },
+  })
+  console.log(
+    `✓ ${STAGES.length} pipeline stages` +
+      (retired.count ? ` (${retired.count} eski aşama pasifleştirildi)` : "")
+  )
 }
 
 main()

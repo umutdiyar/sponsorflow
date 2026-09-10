@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import {
   ArchiveIcon,
   CheckIcon,
+  Loader2Icon,
   MoreHorizontalIcon,
   PackageIcon,
   PencilIcon,
@@ -20,6 +21,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { EmptyState } from "@/components/common/empty-state"
 import { formatMoney } from "@/lib/format"
 import { archivePackage } from "@/features/packages/actions"
@@ -41,15 +51,7 @@ export function PackagesView({
 }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<PackageRow | null>(null)
-  const [, startTransition] = useTransition()
-
-  function onArchive(pkg: PackageRow) {
-    startTransition(async () => {
-      const result = await archivePackage(pkg.id)
-      if (result.ok) toast.success("Paket arşivlendi.")
-      else toast.error(result.error)
-    })
-  }
+  const [archiveTarget, setArchiveTarget] = useState<PackageRow | null>(null)
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +130,7 @@ export function PackagesView({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               variant="destructive"
-                              onSelect={() => onArchive(pkg)}
+                              onSelect={() => setArchiveTarget(pkg)}
                             >
                               <ArchiveIcon />
                               Arşivle
@@ -157,7 +159,7 @@ export function PackagesView({
               ) : null}
 
               <p className="text-muted-foreground mt-auto text-xs">
-                {pkg.opportunityCount} fırsatta kullanılıyor
+                {pkg.opportunityCount} süreçte kullanılıyor
               </p>
             </li>
           ))}
@@ -172,6 +174,67 @@ export function PackagesView({
         }}
         pkg={editTarget}
       />
+      <ArchivePackageDialog
+        target={archiveTarget}
+        onOpenChange={(o) => {
+          if (!o) setArchiveTarget(null)
+        }}
+      />
     </div>
+  )
+}
+
+function ArchivePackageDialog({
+  target,
+  onOpenChange,
+}: {
+  target: PackageRow | null
+  onOpenChange: (open: boolean) => void
+}) {
+  const [isPending, startTransition] = useTransition()
+
+  function onConfirm() {
+    if (!target) return
+    startTransition(async () => {
+      const result = await archivePackage(target.id)
+      if (result.ok) {
+        toast.success("Paket arşivlendi.")
+        onOpenChange(false)
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  return (
+    <Dialog open={target !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Paketi arşivle</DialogTitle>
+          <DialogDescription>
+            <span className="font-medium">{target?.name}</span> arşivlenecek ve
+            yeni süreçlerde seçilemeyecek. Bu paketi kullanan mevcut süreçler
+            etkilenmez.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose
+            render={<Button type="button" variant="outline" />}
+            disabled={isPending}
+          >
+            Vazgeç
+          </DialogClose>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2Icon className="animate-spin" /> : null}
+            Arşivle
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

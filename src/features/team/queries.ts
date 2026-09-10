@@ -1,11 +1,9 @@
 import "server-only"
 
 import { prisma } from "@/lib/db/prisma"
-import type {
-  InvitationStatus,
-  OrganizationRole,
-} from "@/generated/prisma/enums"
+import type { OrganizationRole } from "@/generated/prisma/enums"
 import { ORGANIZATION_ROLE_LABELS } from "@/lib/auth/permissions"
+import { addDaysToKey, istanbulDayKey, parseIstanbulDate } from "@/lib/format"
 
 export type TeamMemberRow = {
   membershipId: string
@@ -16,22 +14,10 @@ export type TeamMemberRow = {
   joinedAt: Date
   isCurrentUser: boolean
   stats: {
-    openCompanies: number
-    openOpportunities: number
-    openTasks: number
+    companies: number
+    followUps: number
+    plannedTasks: number
   }
-}
-
-export type PendingInvitationRow = {
-  id: string
-  email: string
-  fullName: string | null
-  role: OrganizationRole
-  roleLabel: string
-  status: InvitationStatus
-  invitedByName: string
-  createdAt: Date
-  expiresAt: Date | null
 }
 
 const ROLE_ORDER: Record<OrganizationRole, number> = {
@@ -50,45 +36,71 @@ export async function getTeamMembers(
   organizationId: string,
   currentMembershipId: string
 ): Promise<TeamMemberRow[]> {
-  const [members, companyCounts, oppCounts, taskCounts] = await Promise.all([
-    prisma.organizationMembership.findMany({
-      where: { organizationId, deactivatedAt: null },
-      select: {
-        id: true,
-        role: true,
-        createdAt: true,
-        profile: { select: { fullName: true, email: true } },
-      },
-    }),
-    prisma.company.groupBy({
-      by: ["ownerMembershipId"],
-      where: { organizationId, archivedAt: null, ownerMembershipId: { not: null } },
-      _count: { _all: true },
-    }),
-    prisma.opportunity.groupBy({
-      by: ["ownerMembershipId"],
-      where: { organizationId, archivedAt: null },
-      _count: { _all: true },
-    }),
-    prisma.task.groupBy({
-      by: ["assignedToMembershipId"],
-      where: {
-        organizationId,
-        archivedAt: null,
-        status: { in: ["TODO", "IN_PROGRESS"] },
-      },
-      _count: { _all: true },
-    }),
-  ])
+  const tomorrowStart = parseIstanbulDate(
+    addDaysToKey(istanbulDayKey(new Date()), 1)
+  )!
+
+  const [members, companyCounts, followupOpps, overdueTasks, plannedTasks] =
+    await Promise.all([
+      prisma.organizationMembership.findMany({
+        where: { organizationId, deactivatedAt: null },
+        select: {
+          id: true,
+          role: true,
+          createdAt: true,
+          profile: { select: { fullName: true, email: true } },
+        },
+      }),
+      prisma.company.groupBy({
+        by: ["ownerMembershipId"],
+        where: {
+          organizationId,
+          archivedAt: null,
+          ownerMembershipId: { not: null },
+        },
+        _count: { _all: true },
+      }),
+      prisma.opportunity.groupBy({
+        by: ["ownerMembershipId"],
+        where: {
+          organizationId,
+          archivedAt: null,
+          nextActionAt: { lt: tomorrowStart },
+        },
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["assignedToMembershipId"],
+        where: {
+          organizationId,
+          archivedAt: null,
+          status: { in: ["TODO", "IN_PROGRESS"] },
+          dueAt: { lt: tomorrowStart },
+        },
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["assignedToMembershipId"],
+        where: {
+          organizationId,
+          archivedAt: null,
+          status: { in: ["TODO", "IN_PROGRESS"] },
+        },
+        _count: { _all: true },
+      }),
+    ])
 
   const companyMap = new Map(
     companyCounts.map((c) => [c.ownerMembershipId, c._count._all])
   )
-  const oppMap = new Map(
-    oppCounts.map((c) => [c.ownerMembershipId, c._count._all])
+  const followupMap = new Map(
+    followupOpps.map((c) => [c.ownerMembershipId, c._count._all])
   )
-  const taskMap = new Map(
-    taskCounts.map((c) => [c.assignedToMembershipId, c._count._all])
+  const overdueTaskMap = new Map(
+    overdueTasks.map((c) => [c.assignedToMembershipId, c._count._all])
+  )
+  const plannedTaskMap = new Map(
+    plannedTasks.map((c) => [c.assignedToMembershipId, c._count._all])
   )
 
   return members
@@ -101,9 +113,10 @@ export async function getTeamMembers(
       joinedAt: m.createdAt,
       isCurrentUser: m.id === currentMembershipId,
       stats: {
-        openCompanies: companyMap.get(m.id) ?? 0,
-        openOpportunities: oppMap.get(m.id) ?? 0,
-        openTasks: taskMap.get(m.id) ?? 0,
+        companies: companyMap.get(m.id) ?? 0,
+        followUps:
+          (followupMap.get(m.id) ?? 0) + (overdueTaskMap.get(m.id) ?? 0),
+        plannedTasks: plannedTaskMap.get(m.id) ?? 0,
       },
     }))
     .sort((a, b) => {
@@ -112,49 +125,10 @@ export async function getTeamMembers(
     })
 }
 
-export async function getPendingInvitations(
-  organizationId: string
-): Promise<PendingInvitationRow[]> {
-  const rows = await prisma.organizationInvitation.findMany({
-    where: { organizationId, status: "PENDING" },
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      role: true,
-      status: true,
-      createdAt: true,
-      expiresAt: true,
-      invitedBy: {
-        select: { profile: { select: { fullName: true, email: true } } },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  })
-
-  return rows.map((r) => ({
-    id: r.id,
-    email: r.email,
-    fullName: r.fullName,
-    role: r.role,
-    roleLabel: ORGANIZATION_ROLE_LABELS[r.role],
-    status: r.status,
-    invitedByName: memberName(r.invitedBy.profile),
-    createdAt: r.createdAt,
-    expiresAt: r.expiresAt,
-  }))
-}
-
 export async function getTeamPageData(
   organizationId: string,
   currentMembershipId: string
-): Promise<{
-  members: TeamMemberRow[]
-  invitations: PendingInvitationRow[]
-}> {
-  const [members, invitations] = await Promise.all([
-    getTeamMembers(organizationId, currentMembershipId),
-    getPendingInvitations(organizationId),
-  ])
-  return { members, invitations }
+): Promise<{ members: TeamMemberRow[] }> {
+  const members = await getTeamMembers(organizationId, currentMembershipId)
+  return { members }
 }

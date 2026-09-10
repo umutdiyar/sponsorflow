@@ -1,21 +1,16 @@
 import Link from "next/link"
+import {
+  Building2Icon,
+  CircleDotIcon,
+  ClockAlertIcon,
+  TargetIcon,
+  UserRoundIcon,
+} from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Panel, PanelContent, PanelHeader } from "@/components/common/panel"
 import { EmptyState } from "@/components/common/empty-state"
-import {
-  BuildingIcon,
-  CheckSquareIcon,
-  ClockAlertIcon,
-  TargetIcon,
-} from "lucide-react"
-import {
-  describeDue,
-  formatMoneyCompact,
-  formatTimeAgo,
-  istanbulDayKey,
-  timelineGroupLabel,
-} from "@/lib/format"
+import { formatTime, formatTimeAgo } from "@/lib/format"
 import { ActivityIcon } from "@/features/activities/components/activity-icon"
 import {
   ACTIVITY_CHANNEL_LABELS,
@@ -23,137 +18,121 @@ import {
 } from "@/features/activities/schema"
 import type { ActivityListItem } from "@/features/activities/queries"
 import type {
-  DashboardAgendaItem,
-  DashboardStageSummary,
-  WorkloadRow,
+  AgendaItem,
+  DashboardMetric,
+  TeamStatusRow,
 } from "@/features/dashboard/queries"
-
-const DUE_TONE: Record<string, string> = {
-  overdue: "text-destructive",
-  today: "text-warning-foreground",
-  soon: "text-foreground",
-  later: "text-muted-foreground",
-  none: "text-muted-foreground",
-}
 
 /* ------------------------------------------------------------------ */
 
-export function MyWorkStrip({
-  work,
-}: {
-  work: {
-    companies: number
-    openOpportunities: number
-    dueToday: number
-    overdue: number
-  }
-}) {
-  const cells = [
-    { label: "Firmam", value: work.companies, href: "/companies?filter=mine" },
-    {
-      label: "Açık Fırsatım",
-      value: work.openOpportunities,
-      href: "/opportunities?owner=me",
-    },
-    { label: "Bugün", value: work.dueToday, href: "/tasks" },
-    { label: "Geciken", value: work.overdue, href: "/tasks?quick=overdue" },
-  ]
+const METRIC_ICONS: Record<string, typeof Building2Icon> = {
+  companies: Building2Icon,
+  unassigned: UserRoundIcon,
+  "follow-ups": ClockAlertIcon,
+  "active-processes": TargetIcon,
+}
+
+export function DashboardMetrics({ metrics }: { metrics: DashboardMetric[] }) {
   return (
-    <div className="bg-border grid grid-cols-2 gap-px overflow-hidden rounded-xl border sm:grid-cols-4">
-      {cells.map((c) => (
-        <Link
-          key={c.label}
-          href={c.href}
-          className="bg-card hover:bg-muted/40 flex flex-col gap-0.5 px-3.5 py-3"
-        >
-          <span
-            className={cn(
-              "font-heading text-lg leading-tight font-semibold tabular-nums",
-              c.label === "Geciken" && c.value > 0 && "text-destructive"
-            )}
-          >
-            {c.value}
-          </span>
-          <span className="text-muted-foreground truncate text-xs">
-            {c.label}
-          </span>
-        </Link>
-      ))}
+    <div className="bg-border grid grid-cols-2 gap-px overflow-hidden rounded-xl border lg:grid-cols-4">
+      {metrics.map((m) => {
+        const Icon = METRIC_ICONS[m.key] ?? CircleDotIcon
+        return (
+          <div key={m.key} className="bg-card flex flex-col gap-1 px-4 py-3.5">
+            <div className="text-muted-foreground flex items-center gap-1.5">
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate text-xs font-medium">{m.label}</span>
+            </div>
+            <span
+              className={cn(
+                "font-heading text-2xl leading-none font-semibold tabular-nums",
+                m.key === "unassigned" && m.value > 0 && "text-warning-foreground",
+                m.key === "follow-ups" && m.value > 0 && "text-destructive"
+              )}
+            >
+              {m.value}
+            </span>
+            <span className="text-muted-foreground truncate text-[0.6875rem]">
+              {m.hint}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 /* ------------------------------------------------------------------ */
 
-export function TodayPanel({
+export function TodayAgenda({
   items,
-  overdueCount,
+  isTeam,
 }: {
-  items: DashboardAgendaItem[]
-  overdueCount: number
+  items: AgendaItem[]
+  isTeam: boolean
 }) {
-  const today = istanbulDayKey(new Date())
-  const list = items
-    .filter((i) => !i.done && (!i.dueAt || istanbulDayKey(i.dueAt) <= today))
-    .slice(0, 10)
-
   return (
     <Panel>
       <PanelHeader
-        title="Bugün Yapılacaklar"
+        title="Bugün"
         description={
-          overdueCount > 0
-            ? `${overdueCount} geciken · bugüne kadar planlanan işler`
-            : "Bugüne kadar planlanan görev ve aksiyonlar"
+          isTeam
+            ? "Ekibin bugünkü görüşme, takip ve görevleri"
+            : "Bugünkü görüşme, takip ve görevlerin"
         }
-        action={{ label: "Tüm görevler", href: "/tasks" }}
+        action={{ label: "Planlama", href: "/tasks" }}
       />
-      {list.length === 0 ? (
+      {items.length === 0 ? (
         <div className="p-4">
           <EmptyState
-            icon={CheckSquareIcon}
-            title="Bugün için bekleyen işin yok"
-            description="Sana atanan bir görev ya da fırsat aksiyonu olduğunda burada görünecek."
+            icon={CircleDotIcon}
+            title="Bugün için planlanmış bir iş yok"
+            description="Görev ve takipler tarih aldığında burada, zaman sırasına göre listelenir."
           />
         </div>
       ) : (
         <ul className="divide-border divide-y">
-          {list.map((item) => {
-            const due = describeDue(item.dueAt)
-            return (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="hover:bg-muted/40 flex items-center gap-3 px-4 py-2.5 text-sm"
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link
+                href={item.href}
+                className="hover:bg-muted/40 flex items-start gap-3 px-4 py-3"
+              >
+                <span
+                  className={cn(
+                    "w-12 shrink-0 pt-0.5 text-xs font-semibold tabular-nums",
+                    item.overdue ? "text-destructive" : "text-muted-foreground"
+                  )}
                 >
-                  <span
-                    className={cn(
-                      "size-1.5 shrink-0 rounded-full",
-                      item.kind === "next-action"
-                        ? "bg-brand"
-                        : "bg-muted-foreground/40"
-                    )}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{item.title}</span>
-                    {item.context ? (
-                      <span className="text-muted-foreground truncate text-xs">
-                        {item.context}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 text-xs font-medium",
-                      DUE_TONE[due.tone]
-                    )}
-                  >
-                    {due.label}
+                  {item.allDay ? "Gün içi" : formatTime(item.dueAt!)}
+                </span>
+                <span
+                  className={cn(
+                    "mt-1 size-1.5 shrink-0 rounded-full",
+                    item.kind === "follow-up"
+                      ? "bg-brand"
+                      : "bg-muted-foreground/40"
+                  )}
+                />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">
+                    {item.company ?? item.title}
                   </span>
-                </Link>
-              </li>
-            )
-          })}
+                  <span className="text-muted-foreground truncate text-xs">
+                    {item.company ? item.title : item.process}
+                    {item.overdue ? (
+                      <span className="text-destructive"> · gecikmiş</span>
+                    ) : null}
+                  </span>
+                </div>
+                {item.ownerName ? (
+                  <span className="text-muted-foreground shrink-0 pt-0.5 text-xs">
+                    {item.ownerName}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </Panel>
@@ -162,151 +141,47 @@ export function TodayPanel({
 
 /* ------------------------------------------------------------------ */
 
-export function UpcomingStrip({ items }: { items: DashboardAgendaItem[] }) {
-  const today = istanbulDayKey(new Date())
-  const dated = items
-    .filter(
-      (i) => i.dueAt && !i.done && istanbulDayKey(i.dueAt) > today
-    )
-    .slice(0, 8)
-
-  return (
-    <Panel>
-      <PanelHeader title="Yaklaşanlar" description="Önümüzdeki günlerin planı" />
-      <PanelContent className="flex flex-col gap-1">
-        {dated.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Tarihli bir işin yok.</p>
-        ) : (
-          dated.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="hover:bg-muted/40 flex items-center gap-3 rounded-lg px-2 py-1.5"
-            >
-              <span className="text-muted-foreground w-16 shrink-0 text-xs font-medium tabular-nums">
-                {shortDay(item.dueAt!)}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {item.title}
-              </span>
-            </Link>
-          ))
-        )}
-      </PanelContent>
-    </Panel>
-  )
-}
-
-function shortDay(date: Date) {
-  const label = timelineGroupLabel(date)
-  if (label === "Bugün" || label === "Yarın" || label === "Dün") return label
-  return label.slice(0, 6)
-}
-
-/* ------------------------------------------------------------------ */
-
-export function StageProgress({
-  stages,
-  currency,
-}: {
-  stages: DashboardStageSummary[]
-  currency: string
-}) {
-  const max = Math.max(...stages.map((s) => s.count), 1)
-  const total = stages.reduce((sum, s) => sum + s.count, 0)
-
-  return (
-    <Panel>
-      <PanelHeader
-        title="Pipeline Özeti"
-        description={`${total} fırsat · ${stages.length} aşama`}
-        action={{ label: "Pipeline", href: "/pipeline" }}
-      />
-      <PanelContent className="flex flex-col gap-2.5">
-        {total === 0 ? (
-          <p className="text-muted-foreground text-sm">Henüz fırsat yok.</p>
-        ) : (
-          stages.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 text-sm">
-              <span className="text-muted-foreground w-32 shrink-0 truncate text-xs">
-                {s.name}
-              </span>
-              <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
-                <div
-                  className={cn(
-                    "h-full rounded-full",
-                    s.type === "WON"
-                      ? "bg-success"
-                      : s.type === "LOST"
-                        ? "bg-destructive/60"
-                        : "bg-foreground/70"
-                  )}
-                  style={{ width: `${(s.count / max) * 100}%` }}
-                />
-              </div>
-              <span className="w-6 shrink-0 text-right text-xs font-medium tabular-nums">
-                {s.count}
-              </span>
-              <span className="text-muted-foreground w-14 shrink-0 text-right text-[0.6875rem] tabular-nums">
-                {s.value > 0 ? formatMoneyCompact(s.value, currency) : ""}
-              </span>
-            </div>
-          ))
-        )}
-      </PanelContent>
-    </Panel>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-
-export function TeamWorkloadPanel({
+export function TeamStatusPanel({
   rows,
   unassigned,
 }: {
-  rows: WorkloadRow[]
+  rows: TeamStatusRow[]
   unassigned: number
 }) {
   return (
     <Panel>
       <PanelHeader
-        title="Ekip İş Yükü"
-        description="Firma ve iş dağılımı"
+        title="Ekip Durumu"
+        description="Kimde kaç firma var ve kimin takip bekleyen işi var"
         action={{ label: "Ekip", href: "/team" }}
       />
       <ul className="divide-border divide-y">
         {rows.map((r) => (
-          <li
-            key={r.membershipId}
-            className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
-          >
-            <span className="flex items-center gap-1.5 truncate font-medium">
-              {r.name}
-              {r.isCurrentUser ? (
-                <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[0.625rem]">
-                  Sen
+          <li key={r.membershipId}>
+            <Link
+              href={`/companies?owner=${r.membershipId}`}
+              className="hover:bg-muted/40 flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+            >
+              <span className="flex items-center gap-1.5 truncate font-medium">
+                {r.name}
+                {r.isCurrentUser ? (
+                  <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[0.625rem]">
+                    Sen
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                {r.companies} firma
+                <span
+                  className={cn(
+                    "ml-2",
+                    r.followUps > 0 && "text-destructive font-medium"
+                  )}
+                >
+                  {r.followUps} takip
                 </span>
-              ) : null}
-            </span>
-            <span className="text-muted-foreground flex shrink-0 items-center gap-3 text-xs tabular-nums">
-              <span className="inline-flex items-center gap-1">
-                <BuildingIcon className="size-3.5" />
-                {r.companies}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <TargetIcon className="size-3.5" />
-                {r.openOpportunities}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1",
-                  r.overdue > 0 && "text-destructive"
-                )}
-              >
-                <ClockAlertIcon className="size-3.5" />
-                {r.overdue}/{r.openTasks}
-              </span>
-            </span>
+            </Link>
           </li>
         ))}
         {unassigned > 0 ? (
@@ -316,17 +191,13 @@ export function TeamWorkloadPanel({
               className="hover:bg-muted/40 flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
             >
               <span className="font-medium">Atanmamış</span>
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs tabular-nums">
-                <BuildingIcon className="size-3.5" />
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                 {unassigned} firma
               </span>
             </Link>
           </li>
         ) : null}
       </ul>
-      <PanelContent className="text-muted-foreground border-t pt-2 text-[0.6875rem]">
-        Sütunlar: firma · açık fırsat · geciken/açık görev
-      </PanelContent>
     </Panel>
   )
 }
@@ -357,19 +228,13 @@ export function RecentActivityPanel({
             <li key={a.id} className="flex items-start gap-3 px-4 py-3">
               <ActivityIcon channel={a.channel} direction={a.direction} />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <p className="text-sm leading-snug">
+                <p className="truncate text-sm leading-snug">
                   {a.title?.trim() ||
                     (a.kind === "STAGE_CHANGE"
                       ? ACTIVITY_KIND_LABELS[a.kind]
                       : `${ACTIVITY_CHANNEL_LABELS[a.channel]} · ${ACTIVITY_KIND_LABELS[a.kind]}`)}
-                  {a.description ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      — {a.description}
-                    </span>
-                  ) : null}
                 </p>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground truncate text-xs">
                   {a.author} · {a.companyName} · {formatTimeAgo(a.occurredAt)}
                 </span>
               </div>

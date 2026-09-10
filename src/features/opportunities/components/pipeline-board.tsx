@@ -181,7 +181,7 @@ export function PipelineBoard({
         <div className="text-muted-foreground animate-in fade-in-0 mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
           <InfoIcon className="size-3.5 shrink-0" />
           <span className="flex-1">
-            Kartın sağındaki tutamağı sürükleyerek fırsatı başka aşamaya
+            Kartın sağındaki tutamağı sürükleyerek süreci başka aşamaya
             taşıyabilirsin. Karta tıklayınca hızlı görünüm açılır.
           </span>
           <button
@@ -296,7 +296,7 @@ function Column({
       <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
         {items.length === 0 ? (
           <p className="text-muted-foreground/70 px-1 py-6 text-center text-xs">
-            Bu aşamada fırsat yok
+            Bu aşamada süreç yok
           </p>
         ) : (
           items.map((opp) => (

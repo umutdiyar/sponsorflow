@@ -9,7 +9,7 @@ import {
   type OpportunityStatus,
 } from "@/features/opportunities/queries"
 
-export const metadata: Metadata = { title: "Fırsatlar" }
+export const metadata: Metadata = { title: "Sponsorluk Süreçleri" }
 
 const VALID_STATUS = new Set<OpportunityStatus>([
   "open",
@@ -50,8 +50,8 @@ export default async function OpportunitiesPage({
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Fırsatlar"
-        description="Aktif sponsorluk görüşmelerini ve potansiyel iş birliklerini takip et."
+        title="Sponsorluk Süreçleri"
+        description="Firmalarla yürüyen sponsorluk süreçlerini ve aşamalarını takip et."
       />
 
       <OpportunitiesView

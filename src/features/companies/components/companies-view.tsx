@@ -33,7 +33,12 @@ import {
 } from "@/components/ui/popover"
 import { EmptyState } from "@/components/common/empty-state"
 import { usePersistentStringSet } from "@/hooks/use-persistent-string-set"
-import { formatDate } from "@/lib/format"
+import { formatTimeAgo } from "@/lib/format"
+import { ACTIVITY_CHANNEL_LABELS } from "@/features/activities/schema"
+import {
+  COMM_STATUS_LABELS,
+  type CommStatus,
+} from "@/features/activities/comm-status"
 import {
   assignCompanyOwner,
   bulkAssignCompanyOwner,
@@ -70,17 +75,23 @@ const QUICK_FILTERS = [
   { key: "focus", label: "Bu Haftanın Odağı" },
 ] as const
 
-type ColKey = "industry" | "owner" | "source" | "location" | "updated"
+/** Secondary columns — off by default; the operational columns are always on. */
+type ExtraCol = "industry" | "source" | "location"
 
-const OPTIONAL_COLS: { key: ColKey; label: string }[] = [
+const EXTRA_COLS: { key: ExtraCol; label: string }[] = [
   { key: "industry", label: "Sektör" },
-  { key: "owner", label: "Sorumlu" },
   { key: "source", label: "Kaynak" },
   { key: "location", label: "Konum" },
-  { key: "updated", label: "Güncellendi" },
 ]
 
-const HIDDEN_COLS_KEY = "sponsorflow:companies:hidden-cols"
+const EXTRA_COLS_KEY = "sponsorflow:companies:extra-cols"
+
+const COMM_TONE: Record<CommStatus, string> = {
+  none: "bg-muted text-muted-foreground",
+  contacted: "bg-muted text-foreground",
+  replied: "bg-success/10 text-success",
+  followup: "bg-destructive/10 text-destructive",
+}
 
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase()
@@ -123,16 +134,16 @@ export function CompaniesView({
     name: string
   } | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [hidden, setHidden] = usePersistentStringSet(HIDDEN_COLS_KEY)
+  const [shownExtra, setShownExtra] = usePersistentStringSet(EXTRA_COLS_KEY)
 
   const toggleCol = useCallback(
-    (key: ColKey) => {
-      const next = new Set(hidden)
+    (key: ExtraCol) => {
+      const next = new Set(shownExtra)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      setHidden(next)
+      setShownExtra(next)
     },
-    [hidden, setHidden]
+    [shownExtra, setShownExtra]
   )
 
   const setParam = useCallback(
@@ -247,7 +258,7 @@ export function CompaniesView({
   )
   const allSelected = rows.length > 0 && selected.size === rows.length
 
-  const show = (key: ColKey) => !hidden.has(key)
+  const showExtra = (key: ExtraCol) => shownExtra.has(key)
 
   function editTargetFromId(id: string): CompanyFormTarget | null {
     const c = rows.find((r) => r.id === id)
@@ -348,8 +359,8 @@ export function CompaniesView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel>Görünür sütunlar</DropdownMenuLabel>
-            {OPTIONAL_COLS.map((c) => (
+            <DropdownMenuLabel>Ek sütunlar</DropdownMenuLabel>
+            {EXTRA_COLS.map((c) => (
               <DropdownMenuItem
                 key={c.key}
                 onSelect={(e) => {
@@ -357,7 +368,7 @@ export function CompaniesView({
                   toggleCol(c.key)
                 }}
               >
-                <Checkbox checked={!hidden.has(c.key)} className="mr-1" />
+                <Checkbox checked={showExtra(c.key)} className="mr-1" />
                 {c.label}
               </DropdownMenuItem>
             ))}
@@ -459,27 +470,32 @@ export function CompaniesView({
                   />
                 </th>
                 <th className="px-3 py-2 font-medium">Firma</th>
-                {show("industry") ? (
-                  <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                <th className="px-3 py-2 font-medium">Sorumlu</th>
+                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                  İletişim Durumu
+                </th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                  Son Temas
+                </th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">
+                  Sonraki Aksiyon
+                </th>
+                <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                  Süreç
+                </th>
+                {showExtra("industry") ? (
+                  <th className="hidden px-3 py-2 font-medium lg:table-cell">
                     Sektör
                   </th>
                 ) : null}
-                {show("owner") ? (
-                  <th className="px-3 py-2 font-medium">Sorumlu</th>
-                ) : null}
-                {show("source") ? (
+                {showExtra("source") ? (
                   <th className="hidden px-3 py-2 font-medium lg:table-cell">
                     Kaynak
                   </th>
                 ) : null}
-                {show("location") ? (
+                {showExtra("location") ? (
                   <th className="hidden px-3 py-2 font-medium lg:table-cell">
                     Konum
-                  </th>
-                ) : null}
-                {show("updated") ? (
-                  <th className="hidden px-3 py-2 font-medium sm:table-cell">
-                    Güncellendi
                   </th>
                 ) : null}
                 <th className="w-9 px-3 py-2" />
@@ -534,38 +550,71 @@ export function CompaniesView({
                         </span>
                       </div>
                     </td>
-                    {show("industry") ? (
-                      <td className="text-muted-foreground hidden max-w-40 truncate px-3 py-2 sm:table-cell">
+                    <td
+                      className="px-3 py-2 whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <OwnerAssignPopover
+                        members={members}
+                        currentMembershipId={c.owner?.membershipId ?? null}
+                        currentName={c.owner?.name ?? null}
+                        onAssign={(id) => applyAssign(c.id, id)}
+                        disabled={!can.assign}
+                      />
+                    </td>
+                    <td className="hidden px-3 py-2 whitespace-nowrap md:table-cell">
+                      <span
+                        className={cn(
+                          "inline-block rounded-full px-2 py-0.5 text-xs font-medium",
+                          COMM_TONE[c.commStatus]
+                        )}
+                      >
+                        {COMM_STATUS_LABELS[c.commStatus]}
+                      </span>
+                    </td>
+                    <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
+                      {c.lastContactAt ? (
+                        <>
+                          {formatTimeAgo(c.lastContactAt)}
+                          {c.lastContactChannel
+                            ? ` · ${ACTIVITY_CHANNEL_LABELS[c.lastContactChannel]}`
+                            : ""}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="text-muted-foreground hidden max-w-56 px-3 py-2 xl:table-cell">
+                      {c.nextAction ? (
+                        <span className="line-clamp-1">
+                          {c.nextAction}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="hidden px-3 py-2 whitespace-nowrap sm:table-cell">
+                      {c.processStage ? (
+                        <span className="text-foreground text-xs">
+                          {c.processStage}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                    {showExtra("industry") ? (
+                      <td className="text-muted-foreground hidden max-w-40 truncate px-3 py-2 lg:table-cell">
                         {c.industry ?? "—"}
                       </td>
                     ) : null}
-                    {show("owner") ? (
-                      <td
-                        className="px-3 py-2 whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <OwnerAssignPopover
-                          members={members}
-                          currentMembershipId={c.owner?.membershipId ?? null}
-                          currentName={c.owner?.name ?? null}
-                          onAssign={(id) => applyAssign(c.id, id)}
-                          disabled={!can.assign}
-                        />
-                      </td>
-                    ) : null}
-                    {show("source") ? (
+                    {showExtra("source") ? (
                       <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
                         {c.source ?? "—"}
                       </td>
                     ) : null}
-                    {show("location") ? (
+                    {showExtra("location") ? (
                       <td className="text-muted-foreground hidden max-w-40 truncate px-3 py-2 lg:table-cell">
                         {[c.city, c.country].filter(Boolean).join(", ") || "—"}
-                      </td>
-                    ) : null}
-                    {show("updated") ? (
-                      <td className="text-muted-foreground hidden px-3 py-2 tabular-nums whitespace-nowrap sm:table-cell">
-                        {formatDate(c.updatedAt)}
                       </td>
                     ) : null}
                     <td

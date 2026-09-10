@@ -14,11 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import type { NavItem } from "@/components/layout/nav-config"
-import {
-  NAV_BOTTOM,
-  NAV_SECTIONS,
-  NAV_TOP,
-} from "@/components/layout/nav-config"
+import { NAV_SECTIONS, NAV_TOP } from "@/components/layout/nav-config"
 import {
   quickSearchCompanies,
   type CompanySearchHit,
@@ -32,7 +28,6 @@ type CommandMenuProps = {
 const GROUPS: { label: string; items: NavItem[] }[] = [
   { label: "Genel", items: NAV_TOP },
   ...NAV_SECTIONS.map((s) => ({ label: s.label, items: s.items })),
-  { label: "Yönetim", items: NAV_BOTTOM },
 ]
 
 /**

@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Ekip" }
 
 export default async function TeamPage() {
   const membership = await requireMembership()
-  const { members, invitations } = await getTeamPageData(
+  const { members } = await getTeamPageData(
     membership.organizationId,
     membership.membershipId
   )
@@ -19,18 +19,17 @@ export default async function TeamPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Ekip"
-        description="Ekip üyelerini davet et, rollerini yönet ve bekleyen davetleri takip et."
+        description="Ekip üyelerini oluştur, rollerini yönet ve iş yüklerini gör."
       />
 
       <TeamView
         members={members}
-        invitations={invitations}
         actorRole={membership.role}
         can={{
-          invite: hasPermission(membership.role, "invitation:create"),
-          revoke: hasPermission(membership.role, "invitation:revoke"),
+          create: hasPermission(membership.role, "invitation:create"),
           changeRole: hasPermission(membership.role, "member:update"),
           remove: hasPermission(membership.role, "member:remove"),
+          resetPassword: hasPermission(membership.role, "member:update"),
         }}
       />
     </div>

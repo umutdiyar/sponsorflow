@@ -238,12 +238,12 @@ export function TaskFormSheet({
 
             {showMore ? (
               <div className="space-y-4">
-                <Field label="Fırsat">
+                <Field label="Sponsorluk Süreci">
                   <select
                     className={selectClass}
                     {...register("opportunityId")}
                   >
-                    <option value="">Fırsata bağlı değil</option>
+                    <option value="">Sürece bağlı değil</option>
                     {opportunities.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.companyName} — {o.title}

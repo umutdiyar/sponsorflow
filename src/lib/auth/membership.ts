@@ -33,14 +33,14 @@ export type CurrentMembership = {
 }
 
 /**
- * First-time provisioning. Access is **invite-gated**:
+ * First-time provisioning fallback.
  *
- *  - The very first authenticated user bootstraps the org as OWNER.
- *  - Everyone else must have a PENDING or ACCEPTED `OrganizationInvitation` for
- *    their email; they join with exactly the role on that invitation, and a
- *    PENDING invite is marked ACCEPTED here. This also covers users who set
- *    their password via the Supabase link and land straight on `/dashboard`
- *    without visiting the accept-invite screen.
+ * Team accounts are normally created directly (`createMember` writes the
+ * Profile + Membership up front), so this path is only reached for:
+ *
+ *  - The very first authenticated user, who bootstraps the org as OWNER.
+ *  - A legacy `OrganizationInvitation` (PENDING/ACCEPTED) for the user's email —
+ *    kept working for any invites issued before direct provisioning.
  *  - Anyone else gets a `ForbiddenError` — no silent MEMBER provisioning.
  *
  * Runs at most once per user; steady state takes the read path.

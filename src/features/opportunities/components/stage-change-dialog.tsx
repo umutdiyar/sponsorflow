@@ -81,7 +81,7 @@ export function StageChangeDialog({
         <DialogHeader>
           <DialogTitle>Aşamayı değiştir</DialogTitle>
           <DialogDescription>
-            Fırsatın pipeline aşamasını güncelle. Değişiklik zaman çizelgesine
+            Sürecin pipeline aşamasını güncelle. Değişiklik zaman çizelgesine
             otomatik olarak eklenir.
           </DialogDescription>
         </DialogHeader>

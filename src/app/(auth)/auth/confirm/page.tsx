@@ -8,10 +8,12 @@ import { Loader2Icon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 /**
- * Landing point for Supabase invite / recovery links. The link lands here with
- * the session either in the URL hash (`#access_token=…`, implicit flow) or as a
- * `?code=` (PKCE). We establish the cookie session, then hand off to the
- * accept-invite screen. No new API surface — this is purely a client shim.
+ * Landing point for Supabase email links (recovery / magic-link, should SMTP be
+ * enabled later). The link lands here with the session either in the URL hash
+ * (`#access_token=…`, implicit flow) or as a `?code=` (PKCE). We establish the
+ * cookie session, then hand off to the dashboard — membership provisioning runs
+ * there. Day-to-day team accounts are created directly and never touch this
+ * route.
  */
 export default function AuthConfirmPage() {
   const router = useRouter()
@@ -50,7 +52,7 @@ export default function AuthConfirmPage() {
 
         // Clean the tokens out of the address bar, then continue.
         window.history.replaceState(null, "", "/auth/confirm")
-        router.replace("/auth/accept-invite")
+        router.replace("/dashboard")
       } catch {
         setError(
           "Oturum doğrulanamadı. Bağlantının süresi dolmuş olabilir; yeni bir davet iste."

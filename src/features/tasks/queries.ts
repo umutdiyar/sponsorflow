@@ -134,26 +134,7 @@ function buildWhere(params: TasksPageParams): Prisma.TaskWhereInput {
   return where
 }
 
-export async function getTasksPageData(
-  params: TasksPageParams
-): Promise<TasksPageData> {
-  const [rows, members] = await Promise.all([
-    prisma.task.findMany({
-      where: buildWhere(params),
-      select: rowSelect,
-      orderBy: [
-        { status: "asc" },
-        { dueAt: { sort: "asc", nulls: "last" } },
-        { createdAt: "desc" },
-      ],
-      take: 500,
-    }),
-    listMembers(params.organizationId),
-  ])
-  return { tasks: rows.map(toRow), members }
-}
-
-/** Every non-archived task for the agenda / plan view (client buckets by day). */
+/** Every non-archived task for the planner (client buckets by week / day). */
 export async function getAgendaTasks(
   params: TasksPageParams
 ): Promise<TasksPageData> {

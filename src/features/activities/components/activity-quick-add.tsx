@@ -378,7 +378,7 @@ export function QuickLogCommunication({
                     className="w-40"
                   />
                   <p className="text-muted-foreground text-xs">
-                    Fırsatın “sonraki aksiyonu” olarak kaydedilir.
+                    Sürecin “sonraki aksiyonu” olarak kaydedilir.
                   </p>
                 </div>
               ) : null}

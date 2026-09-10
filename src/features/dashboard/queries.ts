@@ -1,8 +1,8 @@
 import "server-only"
 
 import { prisma } from "@/lib/db/prisma"
-import type { PipelineStageType } from "@/generated/prisma/enums"
-import { istanbulDayKey, parseIstanbulDate } from "@/lib/format"
+import { addDaysToKey, istanbulDayKey, parseIstanbulDate } from "@/lib/format"
+import { listMembers } from "@/lib/org/reference"
 import {
   listRecentActivities,
   type ActivityListItem,
@@ -11,72 +11,52 @@ import {
 export type DashboardMetric = {
   key: string
   label: string
-  value: string
+  value: number
   hint: string
 }
 
-export type DashboardStageSummary = {
+export type AgendaItem = {
   id: string
-  name: string
-  type: PipelineStageType
-  count: number
-  value: number
-}
-
-export type DashboardAgendaItem = {
-  id: string
-  kind: "task" | "next-action"
+  kind: "task" | "follow-up"
   title: string
-  context: string | null
+  company: string | null
+  process: string | null
+  ownerName: string | null
   href: string
   dueAt: Date | null
-  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | null
-  done: boolean
+  allDay: boolean
+  overdue: boolean
 }
 
-export type WorkloadRow = {
+export type TeamStatusRow = {
   membershipId: string
   name: string
   companies: number
-  openOpportunities: number
-  openTasks: number
-  overdue: number
+  followUps: number
   isCurrentUser: boolean
 }
 
 export type DashboardData = {
   metrics: DashboardMetric[]
-  currency: string
-  stageSummary: DashboardStageSummary[]
-  agenda: DashboardAgendaItem[]
-  overdueCount: number
-  recentActivities: ActivityListItem[]
-  workload: WorkloadRow[] | null
+  agenda: AgendaItem[]
+  team: TeamStatusRow[]
   unassignedCompanies: number
-  myWork: {
-    companies: number
-    openOpportunities: number
-    dueToday: number
-    overdue: number
-  }
-}
-
-const nf = new Intl.NumberFormat("tr-TR")
-
-function money(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount)
-  } catch {
-    return `${nf.format(amount)} ${currency}`
-  }
+  recentActivities: ActivityListItem[]
+  /** Whether the agenda covers the whole team (lead) or just the viewer. */
+  agendaIsTeam: boolean
 }
 
 function memberName(p: { fullName: string | null; email: string }) {
   return p.fullName?.trim() || p.email
+}
+
+/** A DateTime stored at UTC-midnight is a date-only ("all day") value here. */
+function isAllDay(d: Date): boolean {
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0
+  )
 }
 
 export async function getDashboardData(args: {
@@ -85,85 +65,79 @@ export async function getDashboardData(args: {
   isLead: boolean
 }): Promise<DashboardData> {
   const { organizationId, membershipId, isLead } = args
-  const todayStart = parseIstanbulDate(istanbulDayKey(new Date()))!
+  const todayKey = istanbulDayKey(new Date())
+  const tomorrowStart = parseIstanbulDate(addDaysToKey(todayKey, 1))!
+
+  const scopeToMe = isLead ? {} : { assignedToMembershipId: membershipId }
+  const oppScopeToMe = isLead ? {} : { ownerMembershipId: membershipId }
 
   const [
-    stages,
-    companyOwnerGroups,
-    stageGroups,
-    openOwnerGroups,
-    wonAgg,
-    proposalActivityCount,
-    members,
-    myTasks,
-    myNextActionOpps,
+    companyGroups,
+    openOppGroups,
+    followupGroups,
     overdueTaskGroups,
+    agendaTasks,
+    agendaFollowups,
+    members,
     recentActivities,
-    openTaskGroups,
   ] = await Promise.all([
-    prisma.pipelineStage.findMany({
-      where: { organizationId, isActive: true },
-      select: { id: true, name: true, type: true, position: true },
-      orderBy: { position: "asc" },
-    }),
     prisma.company.groupBy({
       by: ["ownerMembershipId"],
       where: { organizationId, archivedAt: null },
       _count: { _all: true },
     }),
     prisma.opportunity.groupBy({
-      by: ["stageId"],
-      where: { organizationId, archivedAt: null },
-      _count: { _all: true },
-      _sum: { estimatedValue: true },
-    }),
-    prisma.opportunity.groupBy({
       by: ["ownerMembershipId"],
       where: { organizationId, archivedAt: null, stage: { type: "OPEN" } },
       _count: { _all: true },
     }),
-    prisma.opportunity.aggregate({
-      where: { organizationId, stage: { type: "WON" } },
+    prisma.opportunity.groupBy({
+      by: ["ownerMembershipId"],
+      where: {
+        organizationId,
+        archivedAt: null,
+        nextActionAt: { lt: tomorrowStart },
+      },
       _count: { _all: true },
-      _sum: { estimatedValue: true },
     }),
-    prisma.activity.count({ where: { organizationId, kind: "PROPOSAL" } }),
-    isLead
-      ? prisma.organizationMembership.findMany({
-          where: { organizationId, deactivatedAt: null },
-          select: {
-            id: true,
-            createdAt: true,
-            profile: { select: { fullName: true, email: true } },
-          },
-          orderBy: { createdAt: "asc" },
-        })
-      : Promise.resolve([]),
+    prisma.task.groupBy({
+      by: ["assignedToMembershipId"],
+      where: {
+        organizationId,
+        archivedAt: null,
+        status: { in: ["TODO", "IN_PROGRESS"] },
+        dueAt: { lt: tomorrowStart },
+      },
+      _count: { _all: true },
+    }),
     prisma.task.findMany({
       where: {
         organizationId,
-        assignedToMembershipId: membershipId,
         archivedAt: null,
         status: { in: ["TODO", "IN_PROGRESS"] },
+        dueAt: { lt: tomorrowStart },
+        ...scopeToMe,
       },
       select: {
         id: true,
         title: true,
         dueAt: true,
-        priority: true,
         opportunityId: true,
         company: { select: { name: true } },
         opportunity: { select: { title: true } },
+        assignedTo: {
+          select: { profile: { select: { fullName: true, email: true } } },
+        },
       },
-      orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { priority: "desc" }],
-      take: 100,
+      orderBy: [{ dueAt: "asc" }],
+      take: 50,
     }),
     prisma.opportunity.findMany({
       where: {
         organizationId,
-        ownerMembershipId: membershipId,
         archivedAt: null,
-        nextActionAt: { not: null },
+        nextActionAt: { lt: tomorrowStart },
+        ...oppScopeToMe,
       },
       select: {
         id: true,
@@ -171,194 +145,131 @@ export async function getDashboardData(args: {
         nextAction: true,
         nextActionAt: true,
         company: { select: { name: true } },
+        owner: {
+          select: { profile: { select: { fullName: true, email: true } } },
+        },
       },
-      orderBy: { nextActionAt: "asc" },
-      take: 100,
+      orderBy: [{ nextActionAt: "asc" }],
+      take: 50,
     }),
-    isLead
-      ? prisma.task.groupBy({
-          by: ["assignedToMembershipId"],
-          where: {
-            organizationId,
-            archivedAt: null,
-            status: { in: ["TODO", "IN_PROGRESS"] },
-            dueAt: { lt: todayStart },
-          },
-          _count: { _all: true },
-        })
-      : Promise.resolve([]),
-    listRecentActivities(organizationId, 6),
-    isLead
-      ? prisma.task.groupBy({
-          by: ["assignedToMembershipId"],
-          where: {
-            organizationId,
-            archivedAt: null,
-            status: { in: ["TODO", "IN_PROGRESS"] },
-          },
-          _count: { _all: true },
-        })
-      : Promise.resolve([]),
+    listMembers(organizationId),
+    listRecentActivities(organizationId, 5),
   ])
-
-  const currency = "TRY"
 
   // Company ownership.
   let totalCompanies = 0
   let unassignedCompanies = 0
   const companiesByOwner = new Map<string, number>()
-  for (const g of companyOwnerGroups) {
+  for (const g of companyGroups) {
     totalCompanies += g._count._all
-    if (g.ownerMembershipId) companiesByOwner.set(g.ownerMembershipId, g._count._all)
-    else unassignedCompanies = g._count._all
+    if (g.ownerMembershipId) {
+      companiesByOwner.set(g.ownerMembershipId, g._count._all)
+    } else {
+      unassignedCompanies = g._count._all
+    }
   }
 
-  // Pipeline stage summary + derived counts.
-  const countByStage = new Map(stageGroups.map((g) => [g.stageId, g._count._all]))
-  const valueByStage = new Map(
-    stageGroups.map((g) => [g.stageId, g._sum.estimatedValue ?? 0])
+  const activeProcesses = openOppGroups.reduce(
+    (sum, g) => sum + g._count._all,
+    0
   )
-  const stageSummary: DashboardStageSummary[] = stages.map((s) => ({
-    id: s.id,
-    name: s.name,
-    type: s.type,
-    count: countByStage.get(s.id) ?? 0,
-    value: valueByStage.get(s.id) ?? 0,
-  }))
-  const activeOpps = stageSummary
-    .filter((s) => s.type === "OPEN")
-    .reduce((sum, s) => sum + s.count, 0)
-  const potentialValue = stageSummary
-    .filter((s) => s.type === "OPEN")
-    .reduce((sum, s) => sum + s.value, 0)
-
-  const meetingStage = stages.find((s) =>
-    s.name.toLocaleLowerCase("tr").includes("görüşme")
+  const followUpTotal = followupGroups.reduce(
+    (sum, g) => sum + g._count._all,
+    0
   )
-  const meetingCount = meetingStage
-    ? (countByStage.get(meetingStage.id) ?? 0)
-    : 0
 
-  const wonValue = wonAgg._sum.estimatedValue ?? 0
-  const wonCount = wonAgg._count._all
-
-  const openOppByOwner = new Map(
-    openOwnerGroups.map((g) => [g.ownerMembershipId, g._count._all])
-  )
-  const overdueByOwner = new Map(
+  const followupByOwner = new Map<string, number>()
+  for (const g of followupGroups) {
+    if (g.ownerMembershipId) {
+      followupByOwner.set(g.ownerMembershipId, g._count._all)
+    }
+  }
+  const overdueTaskByOwner = new Map(
     overdueTaskGroups.map((g) => [g.assignedToMembershipId, g._count._all])
   )
 
-  // Agenda = my tasks + my opportunity next actions.
-  const agenda: DashboardAgendaItem[] = [
-    ...myTasks.map(
-      (t): DashboardAgendaItem => ({
-        id: `task:${t.id}`,
-        kind: "task",
-        title: t.title,
-        context: t.opportunity?.title ?? t.company?.name ?? null,
-        href: t.opportunityId ? `/opportunities/${t.opportunityId}` : "/tasks",
-        dueAt: t.dueAt,
-        priority: t.priority,
-        done: false,
-      })
-    ),
-    ...myNextActionOpps.map(
-      (o): DashboardAgendaItem => ({
-        id: `next:${o.id}`,
-        kind: "next-action",
-        title: o.nextAction?.trim() || "Sonraki aksiyon",
-        context: `${o.company.name} · ${o.title}`,
-        href: `/opportunities/${o.id}`,
-        dueAt: o.nextActionAt,
-        priority: null,
-        done: false,
-      })
-    ),
+  // Agenda — today (or earlier) tasks + opportunity follow-ups.
+  const agenda: AgendaItem[] = [
+    ...agendaTasks.map((t): AgendaItem => ({
+      id: `task:${t.id}`,
+      kind: "task",
+      title: t.title,
+      company: t.company?.name ?? null,
+      process: t.opportunity?.title ?? null,
+      ownerName: memberName(t.assignedTo.profile),
+      href: t.opportunityId
+        ? `/opportunities/${t.opportunityId}`
+        : "/tasks",
+      dueAt: t.dueAt,
+      allDay: t.dueAt ? isAllDay(t.dueAt) : true,
+      overdue: t.dueAt ? istanbulDayKey(t.dueAt) < todayKey : false,
+    })),
+    ...agendaFollowups.map((o): AgendaItem => ({
+      id: `follow:${o.id}`,
+      kind: "follow-up",
+      title: o.nextAction?.trim() || "Takip",
+      company: o.company.name,
+      process: o.title,
+      ownerName: o.owner ? memberName(o.owner.profile) : null,
+      href: `/opportunities/${o.id}`,
+      dueAt: o.nextActionAt,
+      allDay: o.nextActionAt ? isAllDay(o.nextActionAt) : true,
+      overdue: o.nextActionAt
+        ? istanbulDayKey(o.nextActionAt) < todayKey
+        : false,
+    })),
   ].sort((a, b) => {
     if (!a.dueAt) return 1
     if (!b.dueAt) return -1
     return a.dueAt.getTime() - b.dueAt.getTime()
   })
 
-  const todayKey = istanbulDayKey(new Date())
-  const overdueCount = agenda.filter(
-    (i) => i.dueAt && istanbulDayKey(i.dueAt) < todayKey
-  ).length
-
-  const myWork = {
-    companies: companiesByOwner.get(membershipId) ?? 0,
-    openOpportunities: openOppByOwner.get(membershipId) ?? 0,
-    dueToday: agenda.filter(
-      (i) => i.dueAt && istanbulDayKey(i.dueAt) === todayKey
-    ).length,
-    overdue: overdueCount,
-  }
-
-  // Team workload (lead only).
-  const openTaskByOwner = new Map(
-    openTaskGroups.map((g) => [g.assignedToMembershipId, g._count._all])
-  )
-  const workload: WorkloadRow[] | null = isLead
-    ? members.map((m) => ({
-        membershipId: m.id,
-        name: memberName(m.profile),
-        companies: companiesByOwner.get(m.id) ?? 0,
-        openOpportunities: openOppByOwner.get(m.id) ?? 0,
-        openTasks: openTaskByOwner.get(m.id) ?? 0,
-        overdue: overdueByOwner.get(m.id) ?? 0,
-        isCurrentUser: m.id === membershipId,
-      }))
-    : null
+  // Team status — everyone's companies + follow-up load.
+  const team: TeamStatusRow[] = members
+    .map((m) => ({
+      membershipId: m.membershipId,
+      name: m.name,
+      companies: companiesByOwner.get(m.membershipId) ?? 0,
+      followUps:
+        (followupByOwner.get(m.membershipId) ?? 0) +
+        (overdueTaskByOwner.get(m.membershipId) ?? 0),
+      isCurrentUser: m.membershipId === membershipId,
+    }))
+    .sort((a, b) => b.companies - a.companies || b.followUps - a.followUps)
 
   const metrics: DashboardMetric[] = [
     {
       key: "companies",
       label: "Firma",
-      value: nf.format(totalCompanies),
-      hint: `${unassignedCompanies} atanmamış`,
+      value: totalCompanies,
+      hint: "toplam firma",
     },
     {
-      key: "active-opportunities",
-      label: "Aktif Fırsat",
-      value: nf.format(activeOpps),
-      hint: `${stageSummary.filter((s) => s.type === "OPEN" && s.count > 0).length} aşamada`,
+      key: "unassigned",
+      label: "Atanmamış",
+      value: unassignedCompanies,
+      hint: "sorumlusu yok",
     },
     {
-      key: "planned-meetings",
-      label: "Görüşme",
-      value: nf.format(meetingCount),
-      hint: "Görüşme aşamasında",
+      key: "follow-ups",
+      label: "Takip Bekleyen",
+      value: followUpTotal,
+      hint: "gecikmiş / bugünkü takip",
     },
     {
-      key: "sent-proposals",
-      label: "Gönderilen Teklif",
-      value: nf.format(proposalActivityCount),
-      hint: "Teklif kaydı",
-    },
-    {
-      key: "won-sponsors",
-      label: "Kazanılan Sponsor",
-      value: nf.format(wonCount),
-      hint: wonValue > 0 ? money(wonValue, currency) : "Bu dönem",
-    },
-    {
-      key: "potential-value",
-      label: "Potansiyel Değer",
-      value: money(potentialValue, currency),
-      hint: "Açık fırsatlar",
+      key: "active-processes",
+      label: "Aktif Sponsor Süreci",
+      value: activeProcesses,
+      hint: "açık pipeline süreci",
     },
   ]
 
   return {
     metrics,
-    currency,
-    stageSummary,
     agenda,
-    overdueCount,
-    recentActivities,
-    workload,
+    team,
     unassignedCompanies,
-    myWork,
+    recentActivities,
+    agendaIsTeam: isLead,
   }
 }

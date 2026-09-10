@@ -34,7 +34,7 @@ export default async function PipelinePage() {
     <div className="mx-auto flex max-w-full flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Pipeline"
-        description="Fırsatları aşamalar arasında sürükleyerek sponsorluk hattını yönet."
+        description="Sponsorluk süreçlerini aşamalar arasında sürükleyerek hattı yönet."
         actions={
           canCreate ? (
             <Button
@@ -42,7 +42,7 @@ export default async function PipelinePage() {
               nativeButton={false}
             >
               <PlusIcon />
-              Fırsat Ekle
+              Yeni Süreç
             </Button>
           ) : undefined
         }
@@ -58,7 +58,7 @@ export default async function PipelinePage() {
         <EmptyState
           icon={GitBranchIcon}
           title="Pipeline henüz boş."
-          description="Fırsat ekledikçe aşamalara göre buraya dizilecek."
+          description="Süreç ekledikçe aşamalara göre buraya dizilecek."
           action={
             canCreate ? (
               <Button
@@ -66,7 +66,7 @@ export default async function PipelinePage() {
                 nativeButton={false}
               >
                 <PlusIcon />
-                Fırsat Ekle
+                Yeni Süreç
               </Button>
             ) : undefined
           }

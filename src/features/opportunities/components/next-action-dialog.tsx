@@ -92,7 +92,7 @@ export function NextActionDialog({
         <DialogHeader>
           <DialogTitle>Sonraki aksiyon</DialogTitle>
           <DialogDescription>
-            Bu fırsat için üzerinde anlaşılan tek sonraki adımı yaz.
+            Bu süreç için üzerinde anlaşılan tek sonraki adımı yaz.
           </DialogDescription>
         </DialogHeader>
 

@@ -13,27 +13,27 @@ yürütmesini sağlamak:
 - Atanmamış firmaları ve takip bekleyen firmaları hızlıca bulmak.
 - Yapılan her görüşmeyi / mesajı kayıt altına almak.
 - "Bu hafta şu firmalara odaklanıyoruz" listesini takip etmek.
-- Sponsorluk sürecini (fırsat → pipeline → kapanış) şeffaf tutmak ve gelecek
+- Sponsorluk sürecini (pipeline aşamaları → kapanış) şeffaf tutmak ve gelecek
   ekiplere temiz bir geçmiş bırakmak.
 
 ## Ana özellikler
 
-- **Kimlik & çok kiracılılık:** Supabase Auth, davet ile üyelik, rol bazlı
-  yetki (VIEWER → MEMBER → SPONSORSHIP_LEAD → ADMIN → OWNER).
+- **Kimlik & çok kiracılılık:** Supabase Auth, doğrudan hesap oluşturma ile
+  üyelik, rol bazlı yetki (VIEWER → MEMBER → SPONSORSHIP_LEAD → ADMIN → OWNER).
 - **Firmalar & kişiler:** liste, hızlı görünüm, sahiplik atama, hızlı filtreler
   (Bana atanan / Atanmamış / Takip gereken / Bu haftanın odağı).
 - **İletişim kaydı:** kanal / tür / yön ekseninde aktivite; hazır şablonlarla
   tek tıkla giriş; kişilerden doğrudan "İletişim Kaydet".
 - **Haftalık odak:** haftanın hedef firma listesi; ilerleme (iletişime geçildi /
   dönüş / görüşme) Activity verisinden türetilir.
-- **Fırsatlar & pipeline:** sürükle-bırak aşama yönetimi, sade kartlar,
+- **Sponsorluk süreçleri & pipeline:** 6 aşamalı sürükle-bırak yönetimi, sade kartlar,
   sonraki aksiyon ve erteleme kısayolları.
-- **Görevler:** liste ve plan görünümü, ilerlemeli form (temel alanlar + "Diğer
+- **Planlama:** haftalık takvim planlayıcı (sürükle-bırak, planlanmamış çekmecesi), ilerlemeli görev formu (temel alanlar + "Diğer
   ayrıntılar").
 - **Sponsorluk paketleri:** yeniden kullanılabilir tier tanımları.
 - **İçe / dışa aktarma:** CSV & Excel ile firma içe aktarma sihirbazı (kolon
-  eşleştirme, doğrulama, tekrar kontrolü); firma / kişi / fırsat dışa aktarma.
-- **Ekip yönetimi:** davet, rol değişikliği, üye çıkarma; çıkarılan üyenin
+  eşleştirme, doğrulama, tekrar kontrolü); firma / kişi / süreç dışa aktarma.
+- **Ekip yönetimi:** doğrudan hesap oluşturma (geçici şifre), rol değişikliği, geçici şifre sıfırlama, üye çıkarma; çıkarılan üyenin
   firmaları "atanmamış"a düşer.
 
 ## Tech Stack
@@ -54,7 +54,7 @@ pnpm db:deploy            # bekleyen migration'ları uygula
 pnpm dev                  # http://localhost:3000
 ```
 
-Ayrıntılı üretim kurulumu (SMTP, redirect URL'ler, e-posta şablonu) için
+Ayrıntılı üretim kurulumu (ekip üyesi oluşturma, ortam değişkenleri) için
 **[`docs/setup.md`](docs/setup.md)**.
 
 ## Environment
@@ -92,9 +92,10 @@ npx prisma generate
 
 ## Supabase
 
-- **Auth:** e-posta + şifre; davet akışı Auth Admin API (`inviteUserByEmail`).
-- **Üretimde özel SMTP zorunlu** — kurulum `docs/setup.md` bölüm 2'de.
-- **Redirect URL allow list'e** `<app-url>/auth/confirm` eklenmeli.
+- **Auth:** e-posta + şifre. Ekip üyeleri Auth Admin API (`admin.createUser`,
+  `email_confirm: true`) ile **doğrudan** oluşturulur — e-posta gönderilmez.
+- **SMTP gerekmez** (kulüp içi kullanım). İleride opsiyonel: `docs/setup.md`
+  bölüm 2b.
 - Mevcut bölge `ap-south-1` (Mumbai); İstanbul'a yakın bir AB bölgesine geçiş
   değerlendirmesi: [`docs/supabase-region-migration.md`](docs/supabase-region-migration.md).
 
@@ -116,10 +117,11 @@ npx prisma generate
 ## Current Status
 
 Kullanımda olan modüller: kimlik & çok kiracılı temel, RBAC, firmalar & kişiler,
-fırsatlar & pipeline, aktivite/iletişim kaydı, görevler, sponsorluk paketleri,
-haftalık odak, ekip davetleri, firma içe aktarma (CSV/XLSX) ve firma/kişi/fırsat
+sponsorluk süreçleri & pipeline (6 aşama), aktivite/iletişim kaydı, haftalık
+planlayıcı, sponsorluk paketleri, haftalık odak, doğrudan ekip hesabı oluşturma,
+firma içe aktarma (CSV/XLSX) ve firma/kişi/süreç
 dışa aktarma, operasyon odaklı dashboard.
 
-Kapsam dışı (bilinçli olarak yok): otomatik e-posta gönderimi, LinkedIn/takvim
+Kapsam dışı (bilinçli olarak yok): otomatik e-posta gönderimi, e-posta daveti / SMTP, LinkedIn/takvim
 entegrasyonu, bildirim altyapısı, kampanya modülü, yapay zeka, gelişmiş
 analitik, satış tahmini, herkese açık kayıt.

@@ -7,14 +7,11 @@ import { hasPermission } from "@/lib/auth/permissions"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/page-header"
 import { listCompanyOptions } from "@/lib/org/reference"
-import { MetricStrip } from "@/features/dashboard/components/metric-strip"
 import {
-  MyWorkStrip,
+  DashboardMetrics,
   RecentActivityPanel,
-  StageProgress,
-  TeamWorkloadPanel,
-  TodayPanel,
-  UpcomingStrip,
+  TeamStatusPanel,
+  TodayAgenda,
 } from "@/features/dashboard/components/dashboard-sections"
 import { getDashboardData } from "@/features/dashboard/queries"
 import { getCurrentWeeklyFocus } from "@/features/weekly-focus/queries"
@@ -41,10 +38,10 @@ export default async function DashboardPage() {
   const canCreateCompany = hasPermission(membership.role, "company:create")
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Genel Bakış"
-        description="Bugün ne yapman gerektiği ve ekibin sponsorluk süreci."
+        description="Bugün ne yapman gerektiği ve ekibin sponsorluk durumu."
         actions={
           canCreateCompany ? (
             <Button
@@ -58,29 +55,25 @@ export default async function DashboardPage() {
         }
       />
 
-      <MetricStrip metrics={data.metrics} />
-      <MyWorkStrip work={data.myWork} />
+      <DashboardMetrics metrics={data.metrics} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="flex flex-col gap-5 lg:col-span-2">
-          <TodayPanel items={data.agenda} overdueCount={data.overdueCount} />
-          <RecentActivityPanel activities={data.recentActivities} />
+        <div className="lg:col-span-2">
+          <TodayAgenda items={data.agenda} isTeam={data.agendaIsTeam} />
         </div>
-        <div className="flex flex-col gap-5">
-          <WeeklyFocusPanel
-            focus={focus}
-            companies={focusCompanies}
-            canManage={isLead}
-          />
-          <UpcomingStrip items={data.agenda} />
-          <StageProgress stages={data.stageSummary} currency={data.currency} />
-          {data.workload ? (
-            <TeamWorkloadPanel
-              rows={data.workload}
-              unassigned={data.unassignedCompanies}
-            />
-          ) : null}
-        </div>
+        <WeeklyFocusPanel
+          focus={focus}
+          companies={focusCompanies}
+          canManage={isLead}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <TeamStatusPanel
+          rows={data.team}
+          unassigned={data.unassignedCompanies}
+        />
+        <RecentActivityPanel activities={data.recentActivities} />
       </div>
     </div>
   )

@@ -1,8 +1,15 @@
 import "server-only"
 
+import type { ActivityChannel } from "@/generated/prisma/enums"
 import { prisma } from "@/lib/db/prisma"
-import { istanbulDayKey, parseIstanbulDate } from "@/lib/format"
+import { addDaysToKey, istanbulDayKey, parseIstanbulDate } from "@/lib/format"
 import { getCurrentFocusCompanyIds } from "@/features/weekly-focus/queries"
+import { lastContactByCompany } from "@/features/activities/queries"
+import {
+  COMM_STALE_DAYS,
+  deriveCommStatus,
+  type CommStatus,
+} from "@/features/activities/comm-status"
 
 export type CompanyQuickFilter =
   | "all"
@@ -45,6 +52,14 @@ export type CompanyRow = {
   country: string | null
   updatedAt: Date
   owner: MemberOption | null
+  /** Operational, derived from Activity + Opportunity data. */
+  commStatus: CommStatus
+  lastContactAt: Date | null
+  lastContactChannel: ActivityChannel | null
+  nextAction: string | null
+  nextActionAt: Date | null
+  /** Stage name of the most advanced non-archived opportunity, or null. */
+  processStage: string | null
 }
 
 function memberName(profile: {
@@ -155,21 +170,121 @@ export async function listCompanies(params: ListCompaniesParams) {
     take: 500,
   })
 
-  const companies: CompanyRow[] = rows.map((c) => ({
-    id: c.id,
-    name: c.name,
-    website: c.website,
-    domain: c.domain,
-    linkedinUrl: c.linkedinUrl,
-    industry: c.industry,
-    source: c.source,
-    city: c.city,
-    country: c.country,
-    updatedAt: c.updatedAt,
-    owner: c.owner
-      ? { membershipId: c.owner.id, name: memberName(c.owner.profile) }
-      : null,
-  }))
+  const ids = rows.map((c) => c.id)
+  const todayKey = istanbulDayKey(new Date())
+  const tomorrowStart = parseIstanbulDate(addDaysToKey(todayKey, 1))!
+  const staleBefore = parseIstanbulDate(
+    addDaysToKey(todayKey, -COMM_STALE_DAYS)
+  )!
+
+  const [lastContact, directionRows, oppRows] = await Promise.all([
+    lastContactByCompany(organizationId, ids),
+    ids.length
+      ? prisma.activity.findMany({
+          where: {
+            organizationId,
+            companyId: { in: ids },
+            channel: { not: "INTERNAL" },
+            direction: { in: ["OUTBOUND", "INBOUND"] },
+          },
+          select: { companyId: true, direction: true, occurredAt: true },
+          orderBy: { occurredAt: "desc" },
+          take: 6000,
+        })
+      : Promise.resolve([]),
+    ids.length
+      ? prisma.opportunity.findMany({
+          where: {
+            organizationId,
+            companyId: { in: ids },
+            archivedAt: null,
+          },
+          select: {
+            companyId: true,
+            nextAction: true,
+            nextActionAt: true,
+            updatedAt: true,
+            stage: { select: { name: true, position: true, type: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ])
+
+  const lastOut = new Map<string, Date>()
+  const lastIn = new Map<string, Date>()
+  for (const r of directionRows) {
+    const map = r.direction === "OUTBOUND" ? lastOut : lastIn
+    if (!map.has(r.companyId)) map.set(r.companyId, r.occurredAt)
+  }
+
+  type OppAgg = {
+    stageName: string | null
+    stagePos: number
+    nextAction: string | null
+    nextActionAt: Date | null
+    overdue: boolean
+  }
+  const oppByCompany = new Map<string, OppAgg>()
+  for (const o of oppRows) {
+    const agg = oppByCompany.get(o.companyId) ?? {
+      stageName: null,
+      stagePos: -1,
+      nextAction: null,
+      nextActionAt: null,
+      overdue: false,
+    }
+    if (o.stage.position > agg.stagePos) {
+      agg.stagePos = o.stage.position
+      agg.stageName = o.stage.name
+    }
+    // Most urgent next action wins.
+    if (
+      o.nextActionAt &&
+      (!agg.nextActionAt || o.nextActionAt < agg.nextActionAt)
+    ) {
+      agg.nextActionAt = o.nextActionAt
+      agg.nextAction = o.nextAction
+    }
+    if (
+      o.stage.type === "OPEN" &&
+      o.nextActionAt &&
+      o.nextActionAt.getTime() < tomorrowStart.getTime()
+    ) {
+      agg.overdue = true
+    }
+    oppByCompany.set(o.companyId, agg)
+  }
+
+  const companies: CompanyRow[] = rows.map((c) => {
+    const lc = lastContact.get(c.id) ?? null
+    const opp = oppByCompany.get(c.id)
+    return {
+      id: c.id,
+      name: c.name,
+      website: c.website,
+      domain: c.domain,
+      linkedinUrl: c.linkedinUrl,
+      industry: c.industry,
+      source: c.source,
+      city: c.city,
+      country: c.country,
+      updatedAt: c.updatedAt,
+      owner: c.owner
+        ? { membershipId: c.owner.id, name: memberName(c.owner.profile) }
+        : null,
+      commStatus: deriveCommStatus({
+        lastOutboundAt: lastOut.get(c.id),
+        lastInboundAt: lastIn.get(c.id),
+        hasOverdueFollowUp: opp?.overdue ?? false,
+        staleBefore,
+      }),
+      lastContactAt: lc?.at ?? null,
+      lastContactChannel: lc?.channel ?? null,
+      nextAction: opp?.nextAction ?? null,
+      nextActionAt: opp?.nextActionAt ?? null,
+      processStage: opp?.stageName ?? null,
+    }
+  })
 
   return companies
 }

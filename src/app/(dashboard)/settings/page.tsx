@@ -4,6 +4,7 @@ import { getCurrentMembership } from "@/lib/auth/membership"
 import { PageHeader } from "@/components/common/page-header"
 import { Panel, PanelHeader, PanelContent } from "@/components/common/panel"
 import { AccountPanel } from "@/features/settings/components/account-panel"
+import { ChangePasswordPanel } from "@/features/settings/components/change-password-panel"
 
 export const metadata: Metadata = { title: "Ayarlar" }
 
@@ -28,6 +29,8 @@ export default async function SettingsPage() {
 
       <AccountPanel roleLabel={membership.roleLabel} />
 
+      <ChangePasswordPanel />
+
       <Panel>
         <PanelHeader title="Organizasyon" description="Aktif çalışma alanın" />
         <PanelContent className="divide-border divide-y py-1">
@@ -38,8 +41,7 @@ export default async function SettingsPage() {
       </Panel>
 
       <p className="text-muted-foreground text-xs">
-        Profil düzenleme, rol yönetimi ve organizasyon ayarları sonraki aşamada
-        eklenecek.
+        Profil düzenleme ve organizasyon ayarları sonraki aşamada eklenecek.
       </p>
     </div>
   )

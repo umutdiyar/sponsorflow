@@ -42,7 +42,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { EmptyState } from "@/components/common/empty-state"
-import { formatDate, formatTimeAgo } from "@/lib/format"
+import { formatTimeAgo } from "@/lib/format"
 import {
   archiveContact,
   createContact,
@@ -54,15 +54,42 @@ import {
 } from "@/features/contacts/schema"
 import { ACTIVITY_CHANNEL_LABELS } from "@/features/activities/schema"
 import { QuickLogCommunication } from "@/features/activities/components/activity-quick-add"
+import { cn } from "@/lib/utils"
+import {
+  COMM_STATUS_LABELS,
+  COMM_STATUSES,
+  type CommStatus,
+} from "@/features/activities/comm-status"
 import type { ContactRow } from "@/features/contacts/queries"
-import type { CompanyRef } from "@/lib/org/reference"
+import type { CompanyRef, MemberRef } from "@/lib/org/reference"
 
 const CHANNEL_LABELS = ACTIVITY_CHANNEL_LABELS
+
+const STATUS_TONE: Record<CommStatus, string> = {
+  none: "bg-muted text-muted-foreground",
+  contacted: "bg-muted text-foreground",
+  replied: "bg-success/10 text-success",
+  followup: "bg-destructive/10 text-destructive",
+}
+
+function CommStatusBadge({ status }: { status: CommStatus }) {
+  return (
+    <span
+      className={cn(
+        "inline-block rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        STATUS_TONE[status]
+      )}
+    >
+      {COMM_STATUS_LABELS[status]}
+    </span>
+  )
+}
 
 type Props = {
   contacts: ContactRow[]
   companies: CompanyRef[]
-  filters: { q: string; company: string }
+  members: MemberRef[]
+  filters: { q: string; company: string; owner: string; status: string }
   can: {
     create: boolean
     update: boolean
@@ -74,7 +101,13 @@ type Props = {
 const selectClass =
   "border-input bg-background h-8 rounded-lg border px-2.5 text-sm outline-none"
 
-export function ContactsView({ contacts, companies, filters, can }: Props) {
+export function ContactsView({
+  contacts,
+  companies,
+  members,
+  filters,
+  can,
+}: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -118,7 +151,9 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
     })
   }
 
-  const hasFilters = Boolean(filters.q || filters.company)
+  const hasFilters = Boolean(
+    filters.q || filters.company || filters.owner || filters.status
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,6 +179,35 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filters.owner}
+          onChange={(e) => setParam("owner", e.target.value)}
+          aria-label="Firma sorumlusuna göre filtrele"
+          className={selectClass}
+        >
+          <option value="">Tüm sorumlular</option>
+          <option value="unassigned">Atanmamış</option>
+          {members.map((m) => (
+            <option key={m.membershipId} value={m.membershipId}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filters.status}
+          onChange={(e) => setParam("status", e.target.value)}
+          aria-label="İletişim durumuna göre filtrele"
+          className={selectClass}
+        >
+          <option value="">Tüm durumlar</option>
+          {COMM_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {COMM_STATUS_LABELS[s]}
             </option>
           ))}
         </select>
@@ -194,18 +258,19 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
             <thead className="bg-background sticky top-0 z-10">
               <tr className="text-muted-foreground border-b text-left text-xs">
                 <th className="px-3 py-2 font-medium">Kişi</th>
+                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                  Firma
+                </th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                  Firma Sorumlusu
+                </th>
                 <th className="hidden px-3 py-2 font-medium sm:table-cell">
                   İletişim
                 </th>
                 <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                  Son İletişim
+                  Son Temas
                 </th>
-                <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                  Sorumlu
-                </th>
-                <th className="hidden px-3 py-2 font-medium sm:table-cell">
-                  Güncellendi
-                </th>
+                <th className="px-3 py-2 font-medium">Durum</th>
                 <th className="w-8 px-3 py-2"></th>
               </tr>
             </thead>
@@ -224,16 +289,26 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                         <span className="text-muted-foreground truncate text-xs">
                           {[c.jobTitle, c.department]
                             .filter(Boolean)
-                            .join(" · ") || "—"}{" "}
-                          ·{" "}
-                          <Link
-                            href={`/companies/${c.companyId}`}
-                            className="hover:text-foreground hover:underline"
-                          >
-                            {c.companyName}
-                          </Link>
+                            .join(" · ") || "—"}
                         </span>
+                        <Link
+                          href={`/companies/${c.companyId}`}
+                          className="text-muted-foreground hover:text-foreground truncate text-xs hover:underline md:hidden"
+                        >
+                          {c.companyName}
+                        </Link>
                       </div>
+                    </td>
+                    <td className="hidden px-3 py-2 md:table-cell">
+                      <Link
+                        href={`/companies/${c.companyId}`}
+                        className="hover:text-foreground truncate hover:underline"
+                      >
+                        {c.companyName}
+                      </Link>
+                    </td>
+                    <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
+                      {c.companyOwnerName ?? "—"}
                     </td>
                     <td className="hidden px-3 py-2 whitespace-nowrap sm:table-cell">
                       <div className="flex items-center gap-1">
@@ -296,11 +371,8 @@ export function ContactsView({ contacts, companies, filters, can }: Props) {
                         "—"
                       )}
                     </td>
-                    <td className="text-muted-foreground hidden px-3 py-2 whitespace-nowrap lg:table-cell">
-                      {c.companyOwnerName ?? "—"}
-                    </td>
-                    <td className="text-muted-foreground hidden px-3 py-2 tabular-nums whitespace-nowrap sm:table-cell">
-                      {formatDate(c.updatedAt)}
+                    <td className="px-3 py-2">
+                      <CommStatusBadge status={c.commStatus} />
                     </td>
                     <td className="px-3 py-2">
                     {can.update || can.archive || can.logActivity ? (

@@ -61,7 +61,7 @@ export function LostReasonDialog({ target, onOpenChange, onSaved }: Props) {
         <DialogHeader>
           <DialogTitle>Kayıp nedeni</DialogTitle>
           <DialogDescription>
-            Fırsat kaybedildi olarak işaretlendi. İstersen kısa bir not
+            Süreç olumsuz olarak işaretlendi. İstersen kısa bir not
             bırakabilirsin — bu adımı atlayabilirsin.
           </DialogDescription>
         </DialogHeader>

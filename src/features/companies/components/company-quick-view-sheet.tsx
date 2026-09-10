@@ -175,7 +175,7 @@ export function CompanyQuickViewSheet({
                     }
                   >
                     <PlusIcon />
-                    Fırsat Ekle
+                    Sürece Ekle
                   </Button>
                   {canEdit ? (
                     <Button
@@ -276,9 +276,11 @@ export function CompanyQuickViewSheet({
                   )}
                 </Section>
 
-                <Section title={`Fırsatlar (${data.opportunities.length})`}>
+                <Section
+                  title={`Sponsorluk Süreçleri (${data.opportunities.length})`}
+                >
                   {data.opportunities.length === 0 ? (
-                    <Empty>Açık fırsat yok.</Empty>
+                    <Empty>Açık süreç yok.</Empty>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
                       {data.opportunities.map((o) => (

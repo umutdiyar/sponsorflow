@@ -145,9 +145,9 @@ export function OpportunitiesView({
           <Input
             defaultValue={filters.q}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Fırsat veya firma ara…"
+            placeholder="Süreç veya firma ara…"
             className="pl-8"
-            aria-label="Fırsat ara"
+            aria-label="Süreç ara"
           />
         </div>
 
@@ -220,7 +220,7 @@ export function OpportunitiesView({
           {canCreate ? (
             <Button onClick={() => setCreateOpen(true)}>
               <PlusIcon />
-              Fırsat Ekle
+              Yeni Süreç
             </Button>
           ) : null}
         </div>
@@ -230,19 +230,19 @@ export function OpportunitiesView({
         hasFilters ? (
           <EmptyState
             icon={SearchIcon}
-            title="Eşleşen fırsat yok."
+            title="Eşleşen süreç yok."
             description="Filtreleri değiştirerek tekrar dene."
           />
         ) : (
           <EmptyState
             icon={TargetIcon}
-            title="Henüz fırsat oluşturulmamış."
-            description="İlk sponsorluk fırsatını oluştur."
+            title="Henüz sponsorluk süreci yok."
+            description="İlk sponsorluk sürecini başlat."
             action={
               canCreate ? (
                 <Button onClick={() => setCreateOpen(true)}>
                   <PlusIcon />
-                  Fırsat Ekle
+                  Yeni Süreç
                 </Button>
               ) : undefined
             }
@@ -254,7 +254,7 @@ export function OpportunitiesView({
             <thead>
               <tr className="text-muted-foreground border-b text-left text-xs">
                 <th className="px-3 py-2 font-medium">Firma</th>
-                <th className="px-3 py-2 font-medium">Fırsat</th>
+                <th className="px-3 py-2 font-medium">Süreç</th>
                 <th className="px-3 py-2 font-medium">Aşama</th>
                 <th className="px-3 py-2 font-medium">Sorumlu</th>
                 <th className="px-3 py-2 font-medium">Paket</th>
@@ -318,7 +318,7 @@ export function OpportunitiesView({
       )}
 
       <p className="text-muted-foreground text-xs">
-        {opportunities.length} fırsat
+        {opportunities.length} süreç
         {totalValue > 0
           ? ` · ${formatMoney(totalValue, opportunities[0]?.currency ?? "TRY")} tahmini değer`
           : null}

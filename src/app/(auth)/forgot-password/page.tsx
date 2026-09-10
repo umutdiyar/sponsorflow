@@ -14,8 +14,12 @@ export default function ForgotPasswordPage() {
           Şifreni mi unuttun?
         </h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Şifre sıfırlama akışı yakında eklenecek. Şu an için erişim sorunlarında
-          organizasyon yöneticisi hesabını yeniden davet edebilir.
+          SponsorFlow şu an yalnızca kulüp içi kullanımda ve e-posta ile şifre
+          sıfırlama açık değil. Erişim sorunlarında organizasyon yöneticisinden
+          (OWNER veya ADMIN) <span className="font-medium">Ekip</span> sayfasından
+          sana yeni bir geçici şifre oluşturmasını iste. Giriş yaptıktan sonra
+          şifreni <span className="font-medium">Ayarlar</span> bölümünden
+          değiştirebilirsin.
         </p>
       </div>
 

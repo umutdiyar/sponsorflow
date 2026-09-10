@@ -20,7 +20,6 @@ import {
 import { BrandIdentity } from "@/components/brand/logo"
 import type { NavItem, NavSection } from "@/components/layout/nav-config"
 import {
-  NAV_BOTTOM,
   NAV_ITEMS,
   NAV_SECTIONS,
   NAV_TOP,
@@ -211,14 +210,6 @@ function SidebarNav({
           )
         )}
       </div>
-
-      <ul className="border-sidebar-border mt-4 flex flex-col gap-0.5 border-t pt-4">
-        {NAV_BOTTOM.map((item) => (
-          <li key={item.href}>
-            <NavLink item={item} collapsed={false} onNavigate={onNavigate} />
-          </li>
-        ))}
-      </ul>
     </nav>
   )
 }

@@ -176,7 +176,7 @@ export function PackageFormSheet({
                 checked={isActive}
                 onCheckedChange={(v) => setIsActive(v === true)}
               />
-              Aktif (fırsatlarda seçilebilir)
+              Aktif (süreçlerde seçilebilir)
             </label>
 
             {error ? (
