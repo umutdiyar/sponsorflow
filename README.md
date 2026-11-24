@@ -1,127 +1,53 @@
 # SponsorFlow
 
-Üniversite toplulukları ve öğrenci organizasyonları için sponsorluk CRM'i.
-Şu an **AWS Student Builder Group at Okan University** sponsorluk ekibi
-tarafından kullanılıyor.
+I built SponsorFlow for the AWS Student Builder Group at Okan University to help student teams track sponsorship conversations and hand them over when committee members change. Each company record brings together the team member responsible, the contact history, and the next follow-up.
 
-## Amaç
+## 📸 Screenshots
 
-Küçük bir sponsorluk ekibinin (5–10 kişi) günlük işini tek yerden, az tıklamayla
-yürütmesini sağlamak:
+| Team sign-in | Sponsorship dashboard |
+| --- | --- |
+| [![SponsorFlow team sign-in page](docs/screenshots/login.png)](docs/screenshots/login.png) | [![Dashboard showing company assignments, follow-ups, and weekly focus](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png) |
 
-- Firmaları ekip üyelerine dağıtmak ve kimde kaç firma olduğunu görmek.
-- Atanmamış firmaları ve takip bekleyen firmaları hızlıca bulmak.
-- Yapılan her görüşmeyi / mesajı kayıt altına almak.
-- "Bu hafta şu firmalara odaklanıyoruz" listesini takip etmek.
-- Sponsorluk sürecini (pipeline aşamaları → kapanış) şeffaf tutmak ve gelecek
-  ekiplere temiz bir geçmiş bırakmak.
+## ⚙️ Features
 
-## Ana özellikler
+- **Company handovers.** Assign companies to team members and keep contacts, meeting notes, and messages with the company record. When a member leaves, their companies return to the unassigned list.
+- **Sponsorship pipeline.** Move opportunities across six stages, record the next action, and track successful and unsuccessful outcomes. Reusable sponsorship packages keep offers consistent.
+- **Weekly planning.** Select priority companies for the week, schedule follow-ups in the planner, and review each company's outreach, replies, and meetings from its activity log.
+- **Team access.** Role-based permissions control who can view records, update sponsorship work, and manage members.
+- **Spreadsheet import and export.** Import company lists from CSV or Excel with column mapping, validation, and duplicate checks. Export company, contact, and opportunity records for reporting or handover.
 
-- **Kimlik & çok kiracılılık:** Supabase Auth, doğrudan hesap oluşturma ile
-  üyelik, rol bazlı yetki (VIEWER → MEMBER → SPONSORSHIP_LEAD → ADMIN → OWNER).
-- **Firmalar & kişiler:** liste, hızlı görünüm, sahiplik atama, hızlı filtreler
-  (Bana atanan / Atanmamış / Takip gereken / Bu haftanın odağı).
-- **İletişim kaydı:** kanal / tür / yön ekseninde aktivite; hazır şablonlarla
-  tek tıkla giriş; kişilerden doğrudan "İletişim Kaydet".
-- **Haftalık odak:** haftanın hedef firma listesi; ilerleme (iletişime geçildi /
-  dönüş / görüşme) Activity verisinden türetilir.
-- **Sponsorluk süreçleri & pipeline:** 6 aşamalı sürükle-bırak yönetimi, sade kartlar,
-  sonraki aksiyon ve erteleme kısayolları.
-- **Planlama:** haftalık takvim planlayıcı (sürükle-bırak, planlanmamış çekmecesi), ilerlemeli görev formu (temel alanlar + "Diğer
-  ayrıntılar").
-- **Sponsorluk paketleri:** yeniden kullanılabilir tier tanımları.
-- **İçe / dışa aktarma:** CSV & Excel ile firma içe aktarma sihirbazı (kolon
-  eşleştirme, doğrulama, tekrar kontrolü); firma / kişi / süreç dışa aktarma.
-- **Ekip yönetimi:** doğrudan hesap oluşturma (geçici şifre), rol değişikliği, geçici şifre sıfırlama, üye çıkarma; çıkarılan üyenin
-  firmaları "atanmamış"a düşer.
+## 🛠️ Technologies
 
-## Tech Stack
+| Layer | Technologies |
+| --- | --- |
+| Application | Next.js 16 App Router, React 19, TypeScript |
+| Data and authentication | PostgreSQL, Prisma 7, Supabase Auth |
+| Interface | Tailwind CSS 4, Radix UI, dnd-kit |
+| End-to-end tests | Playwright |
 
-- **Next.js 16** (App Router, Turbopack) + **React 19** + **TypeScript** (strict)
-- **Prisma 7** (`prisma-client` generator, `@prisma/adapter-pg`)
-- **PostgreSQL** (Supabase)
-- **Supabase Auth** (`@supabase/ssr`)
-- **Tailwind CSS 4**, Radix + Base UI primitifleri, `cmdk`, `@dnd-kit`
-- **pnpm**
+## 💻 Running locally
 
-## Local Setup
+Use pnpm and a Supabase development project with PostgreSQL and email/password authentication.
+
+```bash
+git clone https://github.com/umutdiyar/sponsorflow.git
+cd sponsorflow
+cp .env.example .env
+```
+
+Fill in the Supabase credentials and both database connection strings in `.env`. Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`. The [setup guide (Turkish)](docs/setup.md) describes each variable and the first-account setup.
 
 ```bash
 pnpm install
-cp .env.example .env      # değerleri kendi Supabase projenle doldur
-pnpm db:deploy            # bekleyen migration'ları uygula
-pnpm dev                  # http://localhost:3000
+pnpm db:deploy
+pnpm db:seed
+pnpm dev
 ```
 
-Ayrıntılı üretim kurulumu (ekip üyesi oluşturma, ortam değişkenleri) için
-**[`docs/setup.md`](docs/setup.md)**.
+Create a confirmed test user in Supabase Authentication, then sign in at [localhost:3000](http://localhost:3000). The seed creates the organization and pipeline stages. The first sign-in provisions the initial owner's membership.
 
-## Environment
+For sample companies, contacts, opportunities, and tasks, run `pnpm fixture` in a second terminal **after the first sign-in**, using a development database.
 
-`.env` içinde gereken anahtarlar (şablon: `.env.example`):
+## 🧪 Development checks
 
-| Değişken | Açıklama |
-| --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase proje URL'i |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable (anon) anahtar — tarayıcıya gider |
-| `SUPABASE_SECRET_KEY` | Service_role anahtarı — yalnızca sunucu, repoya yazılmaz |
-| `DATABASE_URL` | Runtime bağlantısı (Transaction Pooler, port 6543) |
-| `DIRECT_URL` | Migration bağlantısı (Session Pooler, port 5432) |
-| `NEXT_PUBLIC_APP_URL` | Uygulamanın herkese açık kök adresi |
-
-> Bu depoda gerçek anahtar / şifre tutulmaz. Tüm sırlar ortam değişkeni veya
-> Supabase Dashboard üzerinden verilir.
-
-## Database
-
-- Şema: [`prisma/schema.prisma`](prisma/schema.prisma)
-- Migration'lar yalnızca **eklemeli (additive)**. Akış:
-
-```bash
-npx prisma migrate diff \
-  --from-schema-datamodel <HEAD schema> \
-  --to-schema-datamodel prisma/schema.prisma \
-  --script > prisma/migrations/<ts>_<ad>/migration.sql
-# migration.sql'i gözden geçir, sonra:
-npx prisma migrate deploy
-npx prisma generate
-```
-
-> `prisma migrate dev` / `prisma migrate reset` **kullanılmaz**.
-
-## Supabase
-
-- **Auth:** e-posta + şifre. Ekip üyeleri Auth Admin API (`admin.createUser`,
-  `email_confirm: true`) ile **doğrudan** oluşturulur — e-posta gönderilmez.
-- **SMTP gerekmez** (kulüp içi kullanım). İleride opsiyonel: `docs/setup.md`
-  bölüm 2b.
-- Mevcut bölge `ap-south-1` (Mumbai); İstanbul'a yakın bir AB bölgesine geçiş
-  değerlendirmesi: [`docs/supabase-region-migration.md`](docs/supabase-region-migration.md).
-
-## Commands
-
-| Komut | İş |
-| --- | --- |
-| `pnpm dev` | Geliştirme sunucusu |
-| `pnpm build` | `prisma generate` + üretim derlemesi |
-| `pnpm start` | Üretim sunucusu |
-| `pnpm lint` | ESLint |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm format` | Prettier (yazar) |
-| `pnpm db:deploy` | `prisma migrate deploy` |
-| `pnpm db:generate` | `prisma generate` |
-| `pnpm db:studio` | Prisma Studio |
-| `pnpm db:seed` | Örnek veri |
-
-## Current Status
-
-Kullanımda olan modüller: kimlik & çok kiracılı temel, RBAC, firmalar & kişiler,
-sponsorluk süreçleri & pipeline (6 aşama), aktivite/iletişim kaydı, haftalık
-planlayıcı, sponsorluk paketleri, haftalık odak, doğrudan ekip hesabı oluşturma,
-firma içe aktarma (CSV/XLSX) ve firma/kişi/süreç
-dışa aktarma, operasyon odaklı dashboard.
-
-Kapsam dışı (bilinçli olarak yok): otomatik e-posta gönderimi, e-posta daveti / SMTP, LinkedIn/takvim
-entegrasyonu, bildirim altyapısı, kampanya modülü, yapay zeka, gelişmiş
-analitik, satış tahmini, herkese açık kayıt.
+Run `pnpm lint` and `pnpm typecheck` for static checks, and `pnpm build` for a production build. The [Playwright guide](e2e/README.md) covers setup for the end-to-end smoke tests.
